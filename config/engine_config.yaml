@@ -30,8 +30,8 @@ ollama_cloud:
       services:  [multimodal]
       endpoints: [/v1/instruct, /v1/chat]
     tandem:
-      tag:       "hermes3:8b-cloud"
-      role:      "reasoning partner / tandem stage-2 / code review"
+      tag:       "hermes-3-kimi:2.6-cloud"
+      role:      "reasoning partner / tandem stage-2 / code review (Hermes-3-Kimi 2.6)"
       services:  [multimodal, coder]
       endpoints: [/v1/tandem-stage2, /v1/coder/review-stage2]
     coder:
@@ -65,7 +65,7 @@ openrouter:
   base_url: "https://openrouter.ai/api/v1"
   models:
     reasoner:         "moonshotai/kimi-k2"
-    tandem:           "nousresearch/hermes-3-llama-3.1-8b"
+    tandem:           "moonshotai/kimi-k2"
     coder:            "qwen/qwen3-coder-30b-a3b-instruct"
     fallback:         "deepseek/deepseek-chat-v3-5"
     monitor_fallback: "moonshotai/kimi-k2"
@@ -75,7 +75,7 @@ hf_router:
   base_url: "https://router.huggingface.co/v1"
   models:
     reasoner:        "moonshotai/Kimi-K2-Instruct"
-    tandem:          "NousResearch/Hermes-3-Llama-3.1-8B"
+    tandem:          "moonshotai/Kimi-K2-Instruct"
     coder:           "Qwen/Qwen3-Coder-30B-A3B-Instruct"
     coder_dedicated: "Qwen/Qwen3-Coder-30B-A3B-Instruct"
   token_rotation:

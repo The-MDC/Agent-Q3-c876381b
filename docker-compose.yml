@@ -8,7 +8,7 @@ version: "3.9"
 #
 #  Cloud model → role mapping:
 #    kimi-vl:a3b-cloud           reasoner   /v1/instruct /v1/chat
-#    hermes3:8b-cloud            tandem     /v1/tandem stage-2
+#    hermes-3-kimi:2.6-cloud     tandem     /v1/tandem stage-2
 #    qwen3:48b-a4b-cloud         coder      /v1/code /v1/tandem stage-3
 #    qwopus:27b-cloud            fallback   /v1/fallback
 #    qwen3-coder:30b-a3b-cloud   coder_ded  /v1/coder /v1/coder/review
@@ -39,7 +39,7 @@ x-app-base: &app-base
     REQUEST_TIMEOUT_SECS:   "300"
     OLLAMA_CLOUD_ENABLED:   "true"
     REASONER_MODEL:         "kimi-vl:a3b-cloud"
-    TANDEM_MODEL:           "hermes3:8b-cloud"
+    TANDEM_MODEL:           "hermes-3-kimi:2.6-cloud"
     CODER_MODEL:            "qwen3:48b-a4b-cloud"
     FALLBACK_MODEL:         "qwopus:27b-cloud"
     CODER_DEDICATED_MODEL:  "qwen3-coder:30b-a3b-cloud"

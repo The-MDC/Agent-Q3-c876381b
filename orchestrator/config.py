@@ -9,14 +9,14 @@ class Settings(BaseSettings):
     # No local GGUFs. Mount host ~/.ollama for device key (id_ed25519).
     #
     #   reasoner        kimi-vl:a3b-cloud          /v1/instruct /v1/chat
-    #   tandem          hermes3:8b-cloud            /v1/tandem stage-2
+    #   tandem          hermes-3-kimi:2.6-cloud     /v1/tandem stage-2
     #   coder           qwen3:48b-a4b-cloud         /v1/code /v1/tandem stage-3
     #   fallback        qwopus:27b-cloud            /v1/fallback
     #   coder_dedicated qwen3-coder:30b-a3b-cloud   /v1/coder /v1/coder/review
     #   analyst         kimi-k2:2.6-cloud           /v1/analyze /v1/research/conviction
     #   monitor         kimi-k2:1t-cloud            /v1/monitor/analyze
     reasoner_model:        str = "kimi-vl:a3b-cloud"
-    tandem_model:          str = "hermes3:8b-cloud"
+    tandem_model:          str = "hermes-3-kimi:2.6-cloud"
     coder_model:           str = "qwen3:48b-a4b-cloud"
     fallback_model:        str = "qwopus:27b-cloud"
     coder_dedicated_model: str = "qwen3-coder:30b-a3b-cloud"
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     openrouter_api_url:        str = "https://openrouter.ai/api/v1"
     openrouter_reasoner_model: str = "moonshotai/kimi-k2"
     openrouter_coder_model:    str = "qwen/qwen3-coder-30b-a3b-instruct"
-    openrouter_tandem_model:   str = "nousresearch/hermes-3-llama-3.1-8b"
+    openrouter_tandem_model:   str = "moonshotai/kimi-k2"
     openrouter_fallback_model: str = "deepseek/deepseek-chat-v3-5"
 
     # ── [3] HuggingFace Router — tertiary compute ─────────────────────────────
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     hf_token_3: str = ""
     hf_router_url:        str = "https://router.huggingface.co/v1"
     hf_reasoner_model:    str = "moonshotai/Kimi-K2-Instruct"
-    hf_tandem_model:      str = "NousResearch/Hermes-3-Llama-3.1-8B"
+    hf_tandem_model:      str = "moonshotai/Kimi-K2-Instruct"
     hf_coder_model:       str = "Qwen/Qwen3-Coder-30B-A3B-Instruct"
     hf_frontier_reasoner: str = "moonshotai/Kimi-K2-Instruct"
     hf_frontier_coder:    str = "Qwen/Qwen3-Coder-30B-A3B-Instruct"

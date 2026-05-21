@@ -68,7 +68,7 @@ check_cloud_model() {
 }
 
 check_cloud_model "kimi-vl:a3b-cloud"          "[reasoner]"
-check_cloud_model "hermes3:8b-cloud"            "[tandem]"
+check_cloud_model "hermes-3-kimi:2.6-cloud"     "[tandem]"
 check_cloud_model "qwen3:48b-a4b-cloud"         "[coder]"
 check_cloud_model "qwopus:27b-cloud"            "[fallback]"
 check_cloud_model "qwen3-coder:30b-a3b-cloud"   "[coder_dedicated]"
@@ -81,7 +81,7 @@ echo "  No local GGUFs — all inference via Ollama Cloud"
 echo ""
 echo "  Role → Cloud Model:"
 echo "    reasoner        kimi-vl:a3b-cloud          /v1/instruct /v1/chat"
-echo "    tandem          hermes3:8b-cloud            /v1/tandem stage-2"
+echo "    tandem          hermes-3-kimi:2.6-cloud     /v1/tandem stage-2"
 echo "    coder           qwen3:48b-a4b-cloud         /v1/code /v1/tandem stage-3"
 echo "    fallback        qwopus:27b-cloud            /v1/fallback"
 echo "    coder_dedicated qwen3-coder:30b-a3b-cloud   /v1/coder /v1/coder/review"
