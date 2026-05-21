@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 free_search.py — Zero-API-key search tools hardcoded into Agent-Q3.
 No secrets needed. Both agents use these as first-pass search.
@@ -18,6 +16,7 @@ Routing:
 """
 import httpx
 import os
+from typing import Optional
 
 # ─── 1. DuckDuckGo ────────────────────────────────────────────────────────────
 
@@ -240,7 +239,7 @@ async def search_wikipedia(
 async def search_github(
     query: str,
     search_type: str = "code",  # code | repositories | issues | users | commits
-    language: str | None = None,
+    language: Optional[str] = None,
     max_results: int = 10,
 ) -> list[dict]:
     """

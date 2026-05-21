@@ -5,12 +5,9 @@ dockerfilePath = "Dockerfile"
 [deploy]
 startCommand = "/start.sh"
 healthcheckPath = "/health"
-healthcheckTimeout = 900
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
 [[services]]
-name = "ollama-agent-q3"
-
-[deploy.env]
-PORT = "${PORT}"
+name = "ollama-gemma4-qwen35-pair"
