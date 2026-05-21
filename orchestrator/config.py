@@ -13,12 +13,14 @@ class Settings(BaseSettings):
     #   coder           qwen3:48b-a4b-cloud         /v1/code /v1/tandem stage-3
     #   fallback        qwopus:27b-cloud            /v1/fallback
     #   coder_dedicated qwen3-coder:30b-a3b-cloud   /v1/coder /v1/coder/review
+    #   analyst         kimi-k2:2.6-cloud           /v1/analyze /v1/research/conviction
     #   monitor         kimi-k2:1t-cloud            /v1/monitor/analyze
     reasoner_model:        str = "kimi-vl:a3b-cloud"
     tandem_model:          str = "hermes3:8b-cloud"
     coder_model:           str = "qwen3:48b-a4b-cloud"
     fallback_model:        str = "qwopus:27b-cloud"
     coder_dedicated_model: str = "qwen3-coder:30b-a3b-cloud"
+    analyst_model:         str = "kimi-k2:2.6-cloud"
 
     ollama_base_url: str = "http://ollama:11434"
     openwebui_url:   str = "http://localhost:3000"

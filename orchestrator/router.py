@@ -57,6 +57,7 @@ LOCAL_MODEL_MAP = {
     "coder":           lambda: settings.coder_model,
     "fallback":        lambda: settings.fallback_model,
     "coder_dedicated": lambda: settings.coder_dedicated_model,
+    "analyst":         lambda: settings.analyst_model,
 }
 
 HF_MODEL_MAP = {
@@ -65,6 +66,7 @@ HF_MODEL_MAP = {
     "coder":           lambda: settings.hf_coder_model,
     "fallback":        lambda: settings.hf_coder_model,
     "coder_dedicated": lambda: settings.hf_frontier_coder,
+    "analyst":         lambda: settings.hf_reasoner_model,   # K2-Instruct as HF fallback
 }
 
 OPENROUTER_MODEL_MAP = {
@@ -73,6 +75,7 @@ OPENROUTER_MODEL_MAP = {
     "coder":           lambda: settings.openrouter_coder_model,
     "fallback":        lambda: settings.openrouter_fallback_model,
     "coder_dedicated": lambda: settings.openrouter_coder_model,
+    "analyst":         lambda: settings.openrouter_reasoner_model,  # kimi-k2 via OR
 }
 
 # cloud_priority fallback chain: LOCAL → OPENROUTER → HF → RUNPOD

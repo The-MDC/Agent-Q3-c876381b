@@ -12,6 +12,7 @@ version: "3.9"
 #    qwen3:48b-a4b-cloud         coder      /v1/code /v1/tandem stage-3
 #    qwopus:27b-cloud            fallback   /v1/fallback
 #    qwen3-coder:30b-a3b-cloud   coder_ded  /v1/coder /v1/coder/review
+#    kimi-k2:2.6-cloud           analyst    /v1/analyze
 #    kimi-k2:1t-cloud            monitor    /v1/monitor/analyze
 #
 #  Containers:
@@ -42,6 +43,7 @@ x-app-base: &app-base
     CODER_MODEL:            "qwen3:48b-a4b-cloud"
     FALLBACK_MODEL:         "qwopus:27b-cloud"
     CODER_DEDICATED_MODEL:  "qwen3-coder:30b-a3b-cloud"
+    ANALYST_MODEL:          "kimi-k2:2.6-cloud"
     KIMI_K2_MODEL:          "kimi-k2:1t-cloud"
   depends_on:
     redis:
@@ -87,7 +89,7 @@ services:
       OLLAMA_HOST:              "0.0.0.0"
       OLLAMA_ORIGINS:           "*"
       OLLAMA_KEEP_ALIVE:        "24h"
-      OLLAMA_MAX_LOADED_MODELS: "6"      # all 6 cloud sessions hot
+      OLLAMA_MAX_LOADED_MODELS: "7"      # all 7 cloud sessions hot
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/"]

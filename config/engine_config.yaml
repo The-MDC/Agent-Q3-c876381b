@@ -49,6 +49,11 @@ ollama_cloud:
       role:      "dedicated code generation (3B active MoE)"
       services:  [coder]
       endpoints: [/v1/coder, /v1/coder/review-stage1]
+    analyst:
+      tag:       "kimi-k2:2.6-cloud"
+      role:      "deep analysis / conviction scoring / research synthesis"
+      services:  [multimodal]
+      endpoints: [/v1/analyze]
     monitor:
       tag:       "kimi-k2:1t-cloud"
       role:      "always-on monitor — outside main router"

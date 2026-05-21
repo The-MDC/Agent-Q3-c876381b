@@ -2,19 +2,24 @@
 Agent-Q3 Orchestrator — Main FastAPI App
 MAD Gambit | github.com/MADdegen/Agent-Q3
 
-Model stack:
-  [1] Kimi-VL-A3B-Instruct i1 Q4_K_M  — primary instruct + vision  → /v1/instruct
-  [2] Hermes3 8B                        — tandem reasoning partner   → /v1/tandem (step 1)
-  [3] Qwen3-48B-A4B-Savant Q6_K        — primary multimodal         → /v1/code
-  [4] Qwopus3.6-27B Q8_0               — fallback multimodal        → /v1/fallback
+Cloud model stack (all via Ollama Cloud):
+  [1] kimi-vl:a3b-cloud          — reasoner  — /v1/instruct, /v1/chat
+  [2] hermes3:8b-cloud           — tandem    — /v1/tandem stage-2
+  [3] qwen3:48b-a4b-cloud        — coder     — /v1/code, /v1/tandem stage-3
+  [4] qwopus:27b-cloud           — fallback  — /v1/fallback
+  [5] qwen3-coder:30b-a3b-cloud  — coder_ded — /v1/coder
+  [6] kimi-k2:2.6-cloud          — analyst   — /v1/analyze
+  [7] kimi-k2:1t-cloud           — monitor   — /v1/monitor/analyze (external)
 
-Composite endpoints:
-  POST /v1/chat     — auto-classify → instruct or multimodal
-  POST /v1/instruct — force Kimi-VL (vision, long-ctx, agent tasks)
-  POST /v1/code     — force Qwen3-48B (multimodal, code, fetch)
-  POST /v1/tandem   — Kimi reasons → Hermes refines → Qwen implements
+Endpoints:
+  POST /v1/chat     — auto-classify → reasoner or coder
+  POST /v1/instruct — force Kimi-VL-A3B (vision, long-ctx, agent)
+  POST /v1/code     — force Qwen3-48B-A4B (multimodal, code)
+  POST /v1/tandem   — Kimi-VL reasons → Hermes3 refines → Qwen3 implements
   POST /v1/fallback — force Qwopus3.6-27B
+  POST /v1/analyze  — Kimi-K2.6 deep analysis + conviction scoring
   GET  /health      — all backends + loaded models
+  GET  /v1/loaded   — full inventory
   GET  /metrics     — Prometheus
 """
 
@@ -48,10 +53,12 @@ log = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI):
     log.info(
         "Agent-Q3 starting",
-        instruct=settings.reasoner_model,
+        reasoner=settings.reasoner_model,
         tandem=settings.tandem_model,
-        multimodal=settings.coder_model,
+        coder=settings.coder_model,
         fallback=settings.fallback_model,
+        analyst=settings.analyst_model,
+        monitor=settings.kimi_k2_model,
         strategy=settings.compute_strategy,
     )
     await memory.connect()
@@ -66,11 +73,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Agent-Q3 Orchestrator",
     description=(
-        "4-model orchestrator: "
-        "Kimi-VL-A3B (instruct/vision) + Hermes3 (tandem) + "
-        "Qwen3-48B-A4B (multimodal) + Qwopus3.6-27B (fallback)"
+        "7-model Ollama Cloud orchestrator: Kimi-VL-A3B (reasoner) + "
+        "Hermes3-8B (tandem) + Qwen3-48B-A4B (coder) + Qwopus3.6-27B (fallback) + "
+        "Qwen3-Coder-30B-A3B (coder_dedicated) + Kimi-K2.6 (analyst) + "
+        "Kimi-K2-1T (monitor)"
     ),
-    version="2.0.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 
@@ -114,10 +122,13 @@ async def root():
         "version": "2.0.0",
         "docs": "/docs",
         "models": {
-            "instruct":   settings.reasoner_model,
-            "tandem":     settings.tandem_model,
-            "multimodal": settings.coder_model,
-            "fallback":   settings.fallback_model,
+            "reasoner":        settings.reasoner_model,
+            "tandem":          settings.tandem_model,
+            "coder":           settings.coder_model,
+            "fallback":        settings.fallback_model,
+            "coder_dedicated": settings.coder_dedicated_model,
+            "analyst":         settings.analyst_model,
+            "monitor":         settings.kimi_k2_model,
         },
         "loaded": {
             "memory_backend": memory.backend,
@@ -142,12 +153,13 @@ async def loaded():
 
     return {
         "models": {
-            "instruct":        settings.reasoner_model,
+            "reasoner":        settings.reasoner_model,
             "tandem":          settings.tandem_model,
-            "multimodal":      settings.coder_model,
+            "coder":           settings.coder_model,
             "fallback":        settings.fallback_model,
             "coder_dedicated": settings.coder_dedicated_model,
-            "monitor_cloud":   settings.kimi_k2_model,
+            "analyst":         settings.analyst_model,
+            "monitor":         settings.kimi_k2_model,
         },
         "memory":  {"backend": memory.backend, "alive": await memory.ping()},
         "skills":  [s.to_dict() for s in skills.all],
@@ -376,3 +388,36 @@ async def tandem(request: ChatRequest):
         "hermes_backend":    hermes_result.get("_backend_used"),
         "qwen_backend":      qwen_result.get("_backend_used"),
     }
+
+
+_ANALYST_SYSTEM = """You are Kimi-K2.6, an advanced analytical intelligence within Agent-Q3.
+Your role: deep situational analysis, conviction scoring, market intelligence, and strategic synthesis.
+Produce structured, evidence-backed analysis. Be precise. Quantify uncertainty where possible."""
+
+
+@app.post("/v1/analyze", response_model=ChatResponse)
+async def analyze(request: ChatRequest):
+    """
+    Kimi-K2.6 deep analysis — conviction scoring, research synthesis, strategic intel.
+    Also available as /v1/research/conviction.
+    """
+    messages = _build_messages(request, system_override=_ANALYST_SYSTEM)
+    force_backend = Backend(request.force_backend) if request.force_backend else None
+    try:
+        result = await router.route(
+            model_role="analyst",
+            messages=messages,
+            force_backend=force_backend,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+        )
+    except Exception as e:
+        log.error("analyze failed", error=str(e))
+        raise HTTPException(status_code=503, detail=str(e))
+    return ChatResponse(
+        content=_extract_content(result),
+        model_role="analyst",
+        model_used=result.get("_model_used", "unknown"),
+        backend_used=result.get("_backend_used", "unknown"),
+        usage=result.get("usage"),
+    )
