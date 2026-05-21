@@ -1,58 +1,130 @@
 # =============================================================================
-# engine_config.yaml - Agent-Q3 Inference Engine Configuration
+# engine_config.yaml — Agent-Q3 Inference Engine Configuration
 #
-# PRIMARY:   Local Ollama (always active, zero cost)
-# SECONDARY: HuggingFace Router (router.huggingface.co/v1 - OpenAI-compat)
-# TERTIARY:  RunPod Serverless (GPU burst, needs positive balance)
-# FALLBACK:  OpenRouter (free-tier frontier models)
+# ALL inference via Ollama Cloud (no local GGUFs, no GPU required)
+# Account: nicholasjmcleod@gmail.com / Device: LN-8RDGA90Ultra
+#
+# Routing chain:
+#   PRIMARY:    Ollama Cloud — 6 cloud sessions hot (zero local storage)
+#   SECONDARY:  OpenRouter — cloud burst / fallback
+#   TERTIARY:   HuggingFace Router — frontier burst
+#   QUATERNARY: RunPod Serverless — GPU scale-out (AMPERE_16, scale-to-zero)
+#   MONITOR:    kimi-k2:1t-cloud — always-on, outside main router
 # =============================================================================
 
-active_engine: "local"   # local | hf_router | runpod | openrouter
+active_engine: "ollama_cloud"
 
-# -- Local Ollama --------------------------------------------------------
-local:
-  base_url: "http://localhost:11434"
-  max_loaded_models: 3
+# ── Ollama Cloud (ALL model roles) ───────────────────────────────────────────
+# Requires: device key at /root/.ollama/id_ed25519 (mount host ~/.ollama)
+# Account: nicholasjmcleod@gmail.com / Device: LN-8RDGA90Ultra
+ollama_cloud:
+  account: "nicholasjmcleod@gmail.com"
+  device:  "LN-8RDGA90Ultra"
+  base_url: "http://ollama:11434"
+  max_sessions: 6
   keep_alive: "24h"
   models:
     reasoner:
-      tag: "hf.co/unsloth/Qwen2.5-VL-32B-Instruct-GGUF:Q4_K_M"
-      role: "multimodal reasoning / deep research / instruction"
-      ctx: 32768
-      size_gb: 20.6
-    support:
-      tag: "hf.co/TeichAI/Qwen3-8B-Kimi-K2-Thinking-Distill-GGUF:Q4_K_M"
-      role: "hybrid reasoning / support / fast instruct"
-      ctx: 32768
-      size_gb: 5.0
+      tag:       "kimi-vl:a3b-cloud"
+      role:      "primary instruct / vision / agent / long-ctx"
+      services:  [multimodal]
+      endpoints: [/v1/instruct, /v1/chat]
+    tandem:
+      tag:       "hermes3:8b-cloud"
+      role:      "reasoning partner / tandem stage-2 / code review"
+      services:  [multimodal, coder]
+      endpoints: [/v1/tandem-stage2, /v1/coder/review-stage2]
     coder:
-      tag: "hf.co/unsloth/QwQ-32B-GGUF:Q4_K_M"
-      role: "deep research / coding / long context"
-      ctx: 131072
-      size_gb: 19.0
+      tag:       "qwen3:48b-a4b-cloud"
+      role:      "primary multimodal / tandem implementation / code"
+      services:  [multimodal]
+      endpoints: [/v1/code, /v1/tandem-stage3]
+    fallback:
+      tag:       "qwopus:27b-cloud"
+      role:      "fallback multimodal when primary overloaded"
+      services:  [multimodal]
+      endpoints: [/v1/fallback]
+    coder_dedicated:
+      tag:       "qwen3-coder:30b-a3b-cloud"
+      role:      "dedicated code generation (3B active MoE)"
+      services:  [coder]
+      endpoints: [/v1/coder, /v1/coder/review-stage1]
+    monitor:
+      tag:       "kimi-k2:1t-cloud"
+      role:      "always-on monitor — outside main router"
+      services:  [monitor]
+      endpoints: [/v1/monitor/analyze]
 
-# -- HuggingFace Router --------------------------------------------------
-hf_router:
-  base_url: "https://router.huggingface.co/v1"
-  models:
-    reasoner: "Qwen/Qwen2.5-VL-32B-Instruct"
-    support:  "Qwen/Qwen3-8B"
-    coder:    "Qwen/QwQ-32B"
-
-# -- RunPod Serverless ---------------------------------------------------
-runpod:
-  endpoint_template: "https://api.runpod.ai/v2/{endpoint_id}/runsync"
-
-# -- OpenRouter fallback -------------------------------------------------
+# ── OpenRouter (secondary compute) ───────────────────────────────────────────
 openrouter:
   base_url: "https://openrouter.ai/api/v1"
   models:
-    reasoner: "qwen/qwen2.5-vl-32b-instruct"
-    support:  "qwen/qwen3-8b"
-    coder:    "qwen/qwq-32b"
+    reasoner:         "moonshotai/kimi-k2"
+    tandem:           "nousresearch/hermes-3-llama-3.1-8b"
+    coder:            "qwen/qwen3-coder-30b-a3b-instruct"
+    fallback:         "deepseek/deepseek-chat-v3-5"
+    monitor_fallback: "moonshotai/kimi-k2"
 
-# -- Perplexity deep research (optional premium) -------------------------
-perplexity:
-  base_url: "https://api.perplexity.ai"
-  default_model: "sonar-deep-research"
-  fast_model: "sonar"
+# ── HuggingFace Router (tertiary compute) ────────────────────────────────────
+hf_router:
+  base_url: "https://router.huggingface.co/v1"
+  models:
+    reasoner:        "moonshotai/Kimi-K2-Instruct"
+    tandem:          "NousResearch/Hermes-3-Llama-3.1-8B"
+    coder:           "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+    coder_dedicated: "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+  token_rotation:
+    - env: HF_TOKEN
+    - env: HF_TOKEN_2
+    - env: HF_TOKEN_3
+
+# ── RunPod Serverless (quaternary — GPU burst) ────────────────────────────────
+runpod:
+  api_url: "https://api.runpod.ai/v2"
+  endpoints:
+    reasoner:
+      id:          "kukl55t0053lob"
+      gpu_class:   "AMPERE_16"
+      workers_min: 0
+      workers_max: 2
+    coder:
+      id:          "kukl55t0053lob"
+      gpu_class:   "AMPERE_16"
+      workers_min: 0
+      workers_max: 2
+  tensorrt_approved: false
+  fallback_to_vllm:  true
+
+# ── Routing (cloud_priority: Ollama Cloud → OpenRouter → HF → RunPod) ────────
+routing:
+  strategy: "cloud_priority"
+  weights:
+    local:      60
+    openrouter: 20
+    hf_router:  15
+    runpod:     5
+
+# ── MCP servers (.mcp.json is the authoritative registry) ────────────────────
+# Active HTTP servers (bridge connects on boot):
+#   reddit-mcp, weather-mcp, kite-trading-mcp, arxiv-mcp,
+#   smithery-search, nymbo-tools, hf-dataview, hf-model-search
+# Skipped (stdio): playwright-mcp
+# Requires container (not in compose yet): searxng-mcp
+
+# ── Tool registry ─────────────────────────────────────────────────────────────
+tools:
+  search:
+    primary:   "perplexity"
+    secondary: "exa"
+    tertiary:  "tavily"
+    fallback:  "free"       # duckduckgo + jina + arxiv + wikipedia + github
+  prediction_markets:
+    polymarket: true
+    mad_gambit: true
+  dataset_bucket:
+    hf_repo: "madDegen/agent-q3"
+    status:  "parquet_failing"   # TODO: fix dataset generation (500 on viewer)
+    contents:
+      - "hq/exports/  — Solidity, prediction markets, LangGraph JSONL"
+      - "hq/feedback/ — RLHF/DPO feedback signals"
+      - "hq/chroma/   — ChromaDB vectors"

@@ -1,33 +1,28 @@
-FROM python:3.12-slim
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent-Q3 Python app image — used by the multimodal, coder, and research services.
+# Ollama runs in its own container (ollama/ollama image) — see docker-compose.yml.
+# ─────────────────────────────────────────────────────────────────────────────
+FROM python:3.11-slim
 
-# ── System deps ───────────────────────────────────────────────────────────────
+# System deps
 RUN apt-get update && apt-get install -y \
-    curl wget \
+    curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Python deps ───────────────────────────────────────────────────────────────
 WORKDIR /app
+
+# Python deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# ── Orchestrator source ───────────────────────────────────────────────────────
+# Source
 COPY orchestrator/ ./orchestrator/
-COPY scripts/start.sh /start.sh
-RUN chmod +x /start.sh
+COPY config/       ./config/
 
-# ── Ports ─────────────────────────────────────────────────────────────────────
-# 8000  → Orchestrator API (external)
-EXPOSE 8000
+EXPOSE 8000 8001 8002
 
-# ── Env defaults ──────────────────────────────────────────────────────────────
-# Railway provides $PORT at runtime — default to 8000 for local dev
-ENV REASONER_MODEL=unsloth/qwen2.5-vl-32b-instruct-gguf:q4_k_m \
-    CODER_MODEL=unsloth/qwq-32b-gguf:q4_k_m \
-    SUPPORT_MODEL=teichai/qwen3-8b-kimi-k2-thinking-distill-gguf:q4_k_m \
-    COMPUTE_STRATEGY=round_robin \
-    LOCAL_WEIGHT=60 \
-    HF_WEIGHT=25 \
-    RUNPOD_WEIGHT=15
-
-ENTRYPOINT ["/start.sh"]
+# Default command runs the multimodal orchestrator.
+# docker-compose overrides this per-service for coder/research.
+CMD ["python", "-m", "uvicorn", "orchestrator.main:app", \
+     "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]

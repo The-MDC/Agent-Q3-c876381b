@@ -1,41 +1,198 @@
 version: "3.9"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent-Q3 — 8-container stack
+# ALL inference via Ollama Cloud (no local GGUFs, no GPU required)
+# Account: nicholasjmcleod@gmail.com / Device: LN-8RDGA90Ultra
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#  Cloud model → role mapping:
+#    kimi-vl:a3b-cloud           reasoner   /v1/instruct /v1/chat
+#    hermes3:8b-cloud            tandem     /v1/tandem stage-2
+#    qwen3:48b-a4b-cloud         coder      /v1/code /v1/tandem stage-3
+#    qwopus:27b-cloud            fallback   /v1/fallback
+#    qwen3-coder:30b-a3b-cloud   coder_ded  /v1/coder /v1/coder/review
+#    kimi-k2:1t-cloud            monitor    /v1/monitor/analyze
+#
+#  Containers:
+#    ollama       — Ollama Cloud proxy (signed-in, no local models)
+#    redis        — shared memory (cache, sessions, events)
+#    mcp-bridge   — :8004  unified MCP gateway (.mcp.json)
+#    multimodal   — :8000  reasoner + tandem + coder + fallback
+#    coder        — :8001  coder_dedicated + tandem review
+#    research     — :8002  Perplexity/Exa/Tavily/Free/Polymarket + synthesis
+#    monitor      — :8003  Kimi K2 always-on monitor (kimi-k2:1t-cloud)
+#    open-webui   — :3000  GUI
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-app-base: &app-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  env_file:
+    - .env
+  environment:
+    OLLAMA_BASE_URL:        "http://ollama:11434"
+    REDIS_URL:              "redis://redis:6379/0"
+    COMPUTE_STRATEGY:       "cloud_priority"
+    REQUEST_TIMEOUT_SECS:   "300"
+    OLLAMA_CLOUD_ENABLED:   "true"
+    REASONER_MODEL:         "kimi-vl:a3b-cloud"
+    TANDEM_MODEL:           "hermes3:8b-cloud"
+    CODER_MODEL:            "qwen3:48b-a4b-cloud"
+    FALLBACK_MODEL:         "qwopus:27b-cloud"
+    CODER_DEDICATED_MODEL:  "qwen3-coder:30b-a3b-cloud"
+    KIMI_K2_MODEL:          "kimi-k2:1t-cloud"
+  depends_on:
+    redis:
+      condition: service_healthy
+    ollama:
+      condition: service_healthy
+  volumes:
+    - ./skills:/app/skills:ro
+    - ./plugins:/app/plugins:ro
+    - ./.mcp.json:/app/.mcp.json:ro
+  restart: unless-stopped
+
 services:
-  agent-q3:
-    build: .
-    container_name: agent-q3
+
+  # ── Shared memory ────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: agent-q3-redis
     ports:
-      - "8000:8000"   # Orchestrator API
-      - "11434:11434" # Raw Ollama API
+      - "6379:6379"
     volumes:
-      - ollama_models:/root/.ollama   # Persist model weights across restarts
-    env_file:
-      - .env
-    environment:
-      PORT: "8000"  # Local dev port — Railway overrides this
-      REASONER_MODEL: ${REASONER_MODEL:-gemma4:e4b-instruct-q4_K_M}
-      CODER_MODEL: ${CODER_MODEL:-qwen3.5:4b-instruct-q4_K_M}
-      COMPUTE_STRATEGY: ${COMPUTE_STRATEGY:-round_robin}
-      OLLAMA_HOST: "0.0.0.0"
-      OLLAMA_ORIGINS: "*"
-      OLLAMA_NUM_GPU: "99"
-      OLLAMA_KEEP_ALIVE: "24h"
-      OLLAMA_MAX_LOADED_MODELS: "2"
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
+
+  # ── Ollama Cloud proxy ────────────────────────────────────────────────────────
+  # No local model storage. Device key at /root/.ollama/id_ed25519 enables
+  # all :cloud model passthrough to ollama.com.
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    container_name: agent-q3-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ~/.ollama:/root/.ollama          # device key + cloud auth — no local GGUF storage
+    environment:
+      OLLAMA_HOST:              "0.0.0.0"
+      OLLAMA_ORIGINS:           "*"
+      OLLAMA_KEEP_ALIVE:        "24h"
+      OLLAMA_MAX_LOADED_MODELS: "6"      # all 6 cloud sessions hot
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s                  # fast start — no local pulls needed
+
+  # ── MCP Bridge ───────────────────────────────────────────────────────────────
+  mcp-bridge:
+    <<: *app-base
+    container_name: agent-q3-mcp-bridge
+    ports:
+      - "8004:8004"
+    command: ["python", "-m", "uvicorn", "orchestrator.services.mcp_bridge:app",
+              "--host", "0.0.0.0", "--port", "8004", "--log-level", "info"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── [DOCKER 1] Multimodal ─────────────────────────────────────────────────────
+  multimodal:
+    <<: *app-base
+    container_name: agent-q3-multimodal
+    ports:
+      - "8000:8000"
+    command: ["python", "-m", "uvicorn", "orchestrator.main:app",
+              "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 120s  # give time for model pulls on first boot
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+
+  # ── [DOCKER 2] Dedicated Coder ────────────────────────────────────────────────
+  coder:
+    <<: *app-base
+    container_name: agent-q3-coder
+    ports:
+      - "8001:8001"
+    command: ["python", "-m", "uvicorn", "orchestrator.services.coder:app",
+              "--host", "0.0.0.0", "--port", "8001", "--log-level", "info"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── [DOCKER 3] Deep Research ──────────────────────────────────────────────────
+  research:
+    <<: *app-base
+    container_name: agent-q3-research
+    ports:
+      - "8002:8002"
+    command: ["python", "-m", "uvicorn", "orchestrator.services.research:app",
+              "--host", "0.0.0.0", "--port", "8002", "--log-level", "info"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── [DOCKER 4] Kimi K2 Always-On Monitor ─────────────────────────────────────
+  monitor:
+    <<: *app-base
+    container_name: agent-q3-monitor
+    ports:
+      - "8003:8003"
+    environment:
+      OLLAMA_BASE_URL:    "http://ollama:11434"
+      REDIS_URL:          "redis://redis:6379/0"
+      KIMI_K2_MODEL:      "kimi-k2:1t-cloud"
+      OLLAMA_CLOUD_ENABLED: "true"
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      MONITOR_TARGETS: "http://multimodal:8000,http://coder:8001,http://research:8002,http://mcp-bridge:8004,http://ollama:11434"
+    command: ["python", "-m", "uvicorn", "orchestrator.services.monitor:app",
+              "--host", "0.0.0.0", "--port", "8003", "--log-level", "info"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── GUI: Open WebUI ────────────────────────────────────────────────────────────
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: agent-q3-webui
+    ports:
+      - "3000:8080"
+    volumes:
+      - open_webui_data:/app/backend/data
+    environment:
+      OLLAMA_BASE_URL:  "http://ollama:11434"
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-change-me-in-env}
+      ENABLE_SIGNUP:    "true"
+      DEFAULT_MODELS:   "kimi-vl:a3b-cloud"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
-  ollama_models:
+  redis_data:
+    driver: local
+  open_webui_data:
     driver: local

@@ -1,8 +1,9 @@
-"""Unit tests for Agent-Q3 orchestrator — classifier, router, schema."""
-from __future__ import annotations
-
+"""
+Unit tests — Agent-Q3 orchestrator
+Tests classifier, router logic, and schema validation without containers.
+"""
+from orchestrator.models import classify_task, Message, ChatRequest
 from orchestrator.config import Settings
-from orchestrator.models import ChatRequest, Message, classify_task
 
 
 def msg(content: str, role: str = "user") -> Message:
@@ -15,7 +16,7 @@ class TestClassifier:
         assert classify_task(msgs) == "coder"
 
     def test_reasoning_prompt_routes_to_reasoner(self):
-        msgs = [msg("analyze the market sentiment for prediction markets")]
+        msgs = [msg("analyze the market sentiment for prediction markets and explain the tradeoffs")]
         assert classify_task(msgs) == "reasoner"
 
     def test_solidity_routes_to_coder(self):
@@ -26,7 +27,7 @@ class TestClassifier:
         msgs = [msg("research the best approach for a prediction market oracle resolution strategy")]
         assert classify_task(msgs) == "reasoner"
 
-    def test_default_is_coder(self):
+    def test_tie_defaults_to_coder(self):
         msgs = [msg("hello")]
         assert classify_task(msgs) == "coder"
 
@@ -54,3 +55,11 @@ class TestChatRequest:
     def test_force_backend_optional(self):
         req = ChatRequest(messages=[msg("test")], force_backend=None)
         assert req.force_backend is None
+
+    def test_tandem_request_structure(self):
+        req = ChatRequest(
+            messages=[msg("implement a prediction market contract")],
+            model_role="auto",
+            max_tokens=4096
+        )
+        assert req.max_tokens == 4096
