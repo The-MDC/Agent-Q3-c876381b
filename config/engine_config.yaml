@@ -69,10 +69,20 @@ openrouter:
 hf_router:
   base_url: "https://router.huggingface.co/v1"
   models:
-    reasoner:        "moonshotai/Kimi-K2-Instruct"
-    tandem:          "NousResearch/Hermes-3-Llama-3.1-8B"
-    coder:           "Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    coder_dedicated: "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+    # Deep reasoner — Claude 4.7 Opus distilled MoE (35B/3B active, APEX quant)
+    # 300K+ downloads, VLM-capable, best-in-class CoT on HF Router
+    deep_reasoner:   "mudler/Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-GGUF"
+    # Reasoner fallback — Claude 4.6 Opus distilled (75.7% MMLU-Pro)
+    reasoner:        "hesamation/Qwen3.6-35B-A3B-Claude-4.6-Opus-Reasoning-Distilled-GGUF"
+    # Tandem — 4B reasoning distill, half the VRAM of Hermes3 8B, better CoT
+    tandem:          "khazarai/Qwen3-4B-Qwen3.6-plus-Reasoning-Distilled-GGUF"
+    # Fallback — TeichAI v2 Claude Opus distill (same org as support model)
+    fallback:        "TeichAI/Qwen3.6-27B-Claude-Opus-Reasoning-Distill-v2-GGUF"
+    # Coder — Unsloth upstream imatrix quant (pin-stable)
+    coder:           "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF"
+    coder_dedicated: "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF"
+    # Multimodal reasoner upgrade — Gemma-4 26B MoE (A4B active, 423K DL)
+    reasoner_vl:     "bartowski/google_gemma-4-26B-A4B-it-GGUF"
   token_rotation:
     - env: HF_TOKEN
     - env: HF_TOKEN_2

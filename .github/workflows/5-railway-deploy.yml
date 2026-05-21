@@ -24,11 +24,11 @@ on:
         description: "Service to redeploy"
         type: choice
         options:
-          - ollama-gemma4-qwen35-pair
+          - agent-q3-orchestrator
           - mad-gambit-gui
           - open-webui-gateway
           - all
-        default: ollama-gemma4-qwen35-pair
+        default: agent-q3-orchestrator
       reason:
         description: "Deploy reason (logged to audit)"
         required: false
@@ -109,10 +109,10 @@ jobs:
               svc    = "all"          # full redeploy on every main push
               reason = f"push to main ({\"${{ github.sha }}\"[:7]})"
           elif event == "repository_dispatch":
-              svc    = dp_svc or "ollama-gemma4-qwen35-pair"
+              svc    = dp_svc or "agent-q3-orchestrator"
               reason = dp_why or "agent-triggered"
           elif not svc:
-              svc = "ollama-gemma4-qwen35-pair"
+              svc = "agent-q3-orchestrator"
 
           print(f"service={svc}")
           print(f"reason={reason}")
@@ -135,10 +135,9 @@ jobs:
           SHA       = "${{ github.sha }}"
 
           SERVICE_MAP = {
-              "ollama-gemma4-qwen35-pair": os.environ["PAIR_SVC_ID"],
-              "agent-q3-orchestrator":      os.environ.get("ORCH_SVC_ID","08d08d03-bd5f-4f3f-83c3-e14abe8ed3ad"),
-              "mad-gambit-gui":            os.environ["GUI_SVC_ID"],
-              "open-webui-gateway":        os.environ["WEBUI_SVC_ID"],
+              "agent-q3-orchestrator": os.environ.get("ORCH_SVC_ID","08d08d03-bd5f-4f3f-83c3-e14abe8ed3ad"),
+              "mad-gambit-gui":        os.environ["GUI_SVC_ID"],
+              "open-webui-gateway":    os.environ["WEBUI_SVC_ID"],
           }
 
           deploy_ids = list(SERVICE_MAP.values()) if SVC_NAME == "all" else [SERVICE_MAP.get(SVC_NAME, os.environ["PAIR_SVC_ID"])]
@@ -193,7 +192,7 @@ jobs:
                   f.write(f"- **Commit**: `{SHA}`\n")
                   f.write(f"- **Status**: {'All OK' if not failed else 'Partial — failed: '+', '.join(failed)}\n\n")
                   f.write(f"| Endpoint | URL |\n|---|---|\n")
-                  f.write(f"| Tandem Pair | https://ollama-gemma4-qwen35-pair-staging.up.railway.app |\n")
+                  f.write(f"| Orchestrator | https://agent-q3-staging.up.railway.app |\n")
                   f.write(f"| GUI | https://mad-gambit-gui-staging.up.railway.app |\n")
                   f.write(f"| OpenWebUI | https://open-webui-gateway-staging.up.railway.app |\n")
 
@@ -211,7 +210,7 @@ jobs:
           import httpx, time, sys
 
           ENDPOINTS = {
-              "Tandem Pair": "https://ollama-gemma4-qwen35-pair-staging.up.railway.app",
+              "Orchestrator": "https://agent-q3-staging.up.railway.app",
               "GUI":          "https://mad-gambit-gui-staging.up.railway.app",
           }
 
@@ -270,7 +269,7 @@ jobs:
               '',
               '| Service | URL |',
               '|---------|-----|',
-              '| 🧠 Tandem Pair (Gemma4+Qwen3.5) | https://ollama-gemma4-qwen35-pair-staging.up.railway.app |',
+              '| 🧠 Agent-Q3 Orchestrator | https://agent-q3-staging.up.railway.app |',
               '| 🖥️ GUI | https://mad-gambit-gui-staging.up.railway.app |',
               '| 🌐 OpenWebUI Gateway | https://open-webui-gateway-staging.up.railway.app |',
               '',
@@ -278,16 +277,16 @@ jobs:
               '',
               '### Pre-merge checklist',
               '- [ ] `POST /v1/tandem` — test tandem reasoning + coding in one call',
-              '- [ ] `GET /health` — verify all backends report ready',
+              '- [ ] `GET /health` — verify all 6 Ollama Cloud models report ready',
               '- [ ] GUI loads and shows MAD Gambit AI branding',
-              '- [ ] OpenWebUI lists all 4 Ollama models',
+              '- [ ] OpenWebUI lists all 6 cloud models',
               '',
               '### Agent-triggered deploys',
               'The orchestrator can trigger this workflow via:',
               '```bash',
               'curl -X POST https://api.github.com/repos/MADdegen/Agent-Q3/dispatches \\',
               '  -H "Authorization: Bearer $GH_PAT" \\',
-              '  -d \'{"event_type":"agent_deploy","client_payload":{"service":"all","reason":"post-training-update"}}\'',
+              '  -d \'{"event_type":"agent_deploy","client_payload":{"service":"agent-q3-orchestrator","reason":"post-training-update"}}\'',
               '```',
             ].join('\n');
 

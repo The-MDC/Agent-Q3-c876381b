@@ -10,4 +10,4 @@ restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
 [[services]]
-name = "ollama-gemma4-qwen35-pair"
+name = "agent-q3-orchestrator"
