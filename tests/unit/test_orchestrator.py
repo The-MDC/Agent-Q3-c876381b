@@ -35,16 +35,16 @@ class TestClassifier:
 class TestSettings:
     def test_defaults(self):
         s = Settings()
-        assert s.reasoner_model == "gemma4:e4b-instruct-q4_K_M"
-        assert s.coder_model == "qwen3.5:4b-instruct-q4_K_M"
+        assert s.reasoner_model == "kimi-vl:a3b-cloud"
+        assert s.coder_model == "qwen3:48b-a4b-cloud"
         assert s.local_weight == 60
-        assert s.hf_weight == 25
-        assert s.runpod_weight == 15
-        assert s.compute_strategy == "round_robin"
+        assert s.hf_weight == 15
+        assert s.runpod_weight == 5
+        assert s.compute_strategy == "cloud_priority"
 
     def test_weights_sum_to_100(self):
         s = Settings()
-        assert s.local_weight + s.hf_weight + s.runpod_weight == 100
+        assert s.local_weight + s.openrouter_weight + s.hf_weight + s.runpod_weight == 100
 
 
 class TestChatRequest:

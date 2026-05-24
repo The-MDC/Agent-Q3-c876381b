@@ -1,7 +1,8 @@
 """
 Models & task classifier — Agent-Q3
 
-Classifies incoming prompts → routes to Reasoner (Gemma4-E4B) or Coder (Qwen3.5-4B)
+Classifies incoming prompts → routes to Reasoner (kimi-vl:a3b-cloud),
+Support (hermes3:8b-cloud), or Coder (qwen3:48b-a4b-cloud).
 """
 
 from pydantic import BaseModel, Field
@@ -45,7 +46,7 @@ class HealthResponse(BaseModel):
 
 # ── Task classifier ───────────────────────────────────────────────────────────
 
-# Keywords that strongly indicate CODE / FETCH tasks → Qwen3.5-4B (Coder)
+# Keywords that strongly indicate CODE / FETCH tasks → Coder (qwen3:48b-a4b-cloud)
 CODER_SIGNALS = re.compile(
     r"\b("
     r"code|function|class|def |import |from .+ import|"
@@ -61,7 +62,7 @@ CODER_SIGNALS = re.compile(
     re.IGNORECASE
 )
 
-# Keywords that strongly indicate REASONING / INSTRUCT tasks → Gemma4-E4B
+# Keywords that strongly indicate REASONING / INSTRUCT tasks → Reasoner (kimi-vl:a3b-cloud)
 REASONER_SIGNALS = re.compile(
     r"\b("
     r"research|analyze|analyse|explain|compare|evaluate|"
@@ -93,7 +94,7 @@ def classify_task(messages: list[Message]) -> Literal["reasoner", "coder"]:
     elif reasoner_hits > coder_hits:
         return "reasoner"
     else:
-        # Tie → default to coder (Qwen3.5-4B is faster on ambiguous tasks)
+        # Tie → default to coder (faster on ambiguous tasks)
         return "coder"
 
 
