@@ -256,17 +256,34 @@
       "api_port": 8000,
       "auto_deploy_branch": "main"
     },
+    "services": {
+      "multimodal":  { "port": 8000, "role": "reasoner + tandem + coder + fallback" },
+      "coder":       { "port": 8001, "role": "dedicated coder + tandem review" },
+      "research":    { "port": 8002, "role": "Perplexity/Exa/Tavily/free + synthesis" },
+      "monitor":     { "port": 8003, "role": "Kimi K2 always-on monitor" },
+      "mcp-bridge":  { "port": 8004, "role": "unified MCP gateway" },
+      "pipelines":   { "port": 9099, "role": "Open WebUI multi-agent middleware",
+                       "pipelines": ["agent-q3-router", "agent-q3-tandem", "agent-q3-research"],
+                       "railway_secret": "RAILWAY_PIPELINES_SERVICE_ID" },
+      "open-webui":  { "port": 3000, "role": "GUI — Ollama Cloud models + agent pipelines" }
+    },
+    "staging_urls": {
+      "orchestrator": "https://agent-q3-staging.up.railway.app",
+      "pipelines":    "https://agent-q3-pipelines-staging.up.railway.app",
+      "open_webui":   "https://open-webui-gateway-staging.up.railway.app",
+      "gui":          "https://mad-gambit-gui-staging.up.railway.app"
+    },
     "compute_cascade": [
-      "Railway (Ollama GPU volume)",
+      "Ollama Cloud (kimi-vl, hermes3, qwen3-48b, qwopus, qwen3-coder, kimi-k2)",
+      "OpenRouter (fallback)",
       "HuggingFace Router",
-      "RunPod (serverless GPU)",
-      "OpenRouter (fallback)"
+      "RunPod (serverless GPU burst)"
     ],
     "memory": {
       "short_term": "Redis (24h TTL)",
       "long_term": "Postgres pgvector (384-dim)"
     },
-    "search": ["DuckDuckGo", "Jina", "ArXiv", "SearXNG", "Exa", "Tavily", "Perplexity"],
+    "search": ["Perplexity", "Exa", "Tavily", "DuckDuckGo", "Jina", "ArXiv", "SearXNG"],
     "cowork": {
       "mcp_endpoint": "/cowork/mcp",
       "memory_endpoint": "/cowork/memory/",

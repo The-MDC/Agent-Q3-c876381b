@@ -1,7 +1,7 @@
 version: "3.9"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Agent-Q3 — 8-container stack
+# Agent-Q3 — 9-container stack
 # ALL inference via Ollama Cloud (no local GGUFs, no GPU required)
 # Account: nicholasjmcleod@gmail.com / Device: LN-8RDGA90Ultra
 # ─────────────────────────────────────────────────────────────────────────────
@@ -22,7 +22,8 @@ version: "3.9"
 #    coder        — :8001  coder_dedicated + tandem review
 #    research     — :8002  Perplexity/Exa/Tavily/Free/Polymarket + synthesis
 #    monitor      — :8003  Kimi K2 always-on monitor (kimi-k2:1t-cloud)
-#    open-webui   — :3000  GUI
+#    pipelines    — :9099  Open WebUI Pipelines (multi-agent middleware)
+#    open-webui   — :3000  GUI (connects to Ollama + Pipelines)
 # ─────────────────────────────────────────────────────────────────────────────
 
 x-app-base: &app-base
@@ -56,7 +57,7 @@ x-app-base: &app-base
 
 services:
 
-  # ── Shared memory ────────────────────────────────────────────────────────────
+  # ── Shared memory ─────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: agent-q3-redis
@@ -71,7 +72,7 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # ── Ollama Cloud proxy ────────────────────────────────────────────────────────
+  # ── Ollama Cloud proxy ────────────────────────────────────────────────────
   # No local model storage. Device key at /root/.ollama/id_ed25519 enables
   # all :cloud model passthrough to ollama.com.
   ollama:
@@ -94,9 +95,9 @@ services:
       interval: 15s
       timeout: 5s
       retries: 20
-      start_period: 30s                  # fast start — no local pulls needed
+      start_period: 30s
 
-  # ── MCP Bridge ───────────────────────────────────────────────────────────────
+  # ── MCP Bridge ────────────────────────────────────────────────────────────
   mcp-bridge:
     <<: *app-base
     container_name: agent-q3-mcp-bridge
@@ -110,7 +111,7 @@ services:
       timeout: 10s
       retries: 5
 
-  # ── [DOCKER 1] Multimodal ─────────────────────────────────────────────────────
+  # ── [DOCKER 1] Multimodal ─────────────────────────────────────────────────
   multimodal:
     <<: *app-base
     container_name: agent-q3-multimodal
@@ -124,7 +125,7 @@ services:
       timeout: 10s
       retries: 5
 
-  # ── [DOCKER 2] Dedicated Coder ────────────────────────────────────────────────
+  # ── [DOCKER 2] Dedicated Coder ───────────────────────────────────────────
   coder:
     <<: *app-base
     container_name: agent-q3-coder
@@ -138,7 +139,7 @@ services:
       timeout: 10s
       retries: 5
 
-  # ── [DOCKER 3] Deep Research ──────────────────────────────────────────────────
+  # ── [DOCKER 3] Deep Research ─────────────────────────────────────────────
   research:
     <<: *app-base
     container_name: agent-q3-research
@@ -152,19 +153,19 @@ services:
       timeout: 10s
       retries: 5
 
-  # ── [DOCKER 4] Kimi K2 Always-On Monitor ─────────────────────────────────────
+  # ── [DOCKER 4] Kimi K2 Always-On Monitor ─────────────────────────────────
   monitor:
     <<: *app-base
     container_name: agent-q3-monitor
     ports:
       - "8003:8003"
     environment:
-      OLLAMA_BASE_URL:    "http://ollama:11434"
-      REDIS_URL:          "redis://redis:6379/0"
-      KIMI_K2_MODEL:      "kimi-k2:1t-cloud"
+      OLLAMA_BASE_URL:      "http://ollama:11434"
+      REDIS_URL:            "redis://redis:6379/0"
+      KIMI_K2_MODEL:        "kimi-k2:1t-cloud"
       OLLAMA_CLOUD_ENABLED: "true"
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      MONITOR_TARGETS: "http://multimodal:8000,http://coder:8001,http://research:8002,http://mcp-bridge:8004,http://ollama:11434"
+      OPENROUTER_API_KEY:   ${OPENROUTER_API_KEY:-}
+      MONITOR_TARGETS:      "http://multimodal:8000,http://coder:8001,http://research:8002,http://mcp-bridge:8004,http://ollama:11434"
     command: ["python", "-m", "uvicorn", "orchestrator.services.monitor:app",
               "--host", "0.0.0.0", "--port", "8003", "--log-level", "info"]
     healthcheck:
@@ -173,7 +174,49 @@ services:
       timeout: 10s
       retries: 5
 
-  # ── GUI: Open WebUI ────────────────────────────────────────────────────────────
+  # ── Pipelines — Open WebUI multi-agent middleware ─────────────────────────
+  # Exposes 3 named agent pipelines as OpenAI-compatible endpoints:
+  #   agent-q3-router   — auto-classifies and routes (reasoner / coder / research)
+  #   agent-q3-tandem   — Kimi-VL reasons → Qwen3-Coder implements
+  #   agent-q3-research — deep research via Perplexity/Exa/Tavily + synthesis
+  # Open WebUI treats these as models alongside the raw Ollama Cloud models.
+  pipelines:
+    image: ghcr.io/open-webui/pipelines:main
+    container_name: agent-q3-pipelines
+    ports:
+      - "9099:9099"
+    volumes:
+      - ./pipelines:/app/pipelines
+      - pipelines_data:/app/data
+    environment:
+      PIPELINES_DIR:     "/app/pipelines"
+      OLLAMA_BASE_URL:   "http://ollama:11434"
+      ORCHESTRATOR_URL:  "http://multimodal:8000"
+      CODER_URL:         "http://coder:8001"
+      RESEARCH_URL:      "http://research:8002"
+      PIPELINES_API_KEY: ${PIPELINES_API_KEY:-0p3n-w3bu!}
+    depends_on:
+      ollama:
+        condition: service_healthy
+      multimodal:
+        condition: service_healthy
+      coder:
+        condition: service_healthy
+      research:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9099/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ── GUI: Open WebUI ───────────────────────────────────────────────────────
+  # Connects to both Ollama Cloud (raw models) and Pipelines (agent models).
+  # Model list in the GUI:
+  #   From Ollama:    kimi-vl:a3b-cloud, hermes3:8b-cloud, qwen3:48b-a4b-cloud,
+  #                   qwopus:27b-cloud, qwen3-coder:30b-a3b-cloud, kimi-k2:1t-cloud
+  #   From Pipelines: agent-q3-router, agent-q3-tandem, agent-q3-research
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: agent-q3-webui
@@ -182,12 +225,18 @@ services:
     volumes:
       - open_webui_data:/app/backend/data
     environment:
-      OLLAMA_BASE_URL:  "http://ollama:11434"
-      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-change-me-in-env}
-      ENABLE_SIGNUP:    "true"
-      DEFAULT_MODELS:   "kimi-vl:a3b-cloud"
+      OLLAMA_BASE_URL:           "http://ollama:11434"
+      OPENAI_API_BASE_URLS:      "http://pipelines:9099"
+      OPENAI_API_KEYS:           ${PIPELINES_API_KEY:-0p3n-w3bu!}
+      WEBUI_SECRET_KEY:          ${WEBUI_SECRET_KEY:-change-me-in-env}
+      WEBUI_NAME:                "MAD Gambit AI"
+      ENABLE_SIGNUP:             "true"
+      ENABLE_COMMUNITY_SHARING:  "false"
+      DEFAULT_MODELS:            "kimi-vl:a3b-cloud"
     depends_on:
       ollama:
+        condition: service_healthy
+      pipelines:
         condition: service_healthy
     restart: unless-stopped
 
@@ -195,4 +244,6 @@ volumes:
   redis_data:
     driver: local
   open_webui_data:
+    driver: local
+  pipelines_data:
     driver: local

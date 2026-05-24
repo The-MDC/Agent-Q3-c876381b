@@ -25,6 +25,7 @@ on:
         type: choice
         options:
           - agent-q3-orchestrator
+          - agent-q3-pipelines
           - mad-gambit-gui
           - open-webui-gateway
           - all
@@ -50,6 +51,7 @@ env:
   ORCH_SVC_ID:        "08d08d03-bd5f-4f3f-83c3-e14abe8ed3ad"
   GUI_SVC_ID:         "f1ea926b-5e43-4524-b3ac-9a837cec0658"
   WEBUI_SVC_ID:       "c54605ac-b99c-4819-809f-453883bf7c92"
+  PIPELINES_SVC_ID:   ${{ secrets.RAILWAY_PIPELINES_SERVICE_ID }}
 
 jobs:
 # ─────────────────────────────────────────────────────────────────────────────
@@ -136,6 +138,7 @@ jobs:
 
           SERVICE_MAP = {
               "agent-q3-orchestrator": os.environ.get("ORCH_SVC_ID","08d08d03-bd5f-4f3f-83c3-e14abe8ed3ad"),
+              "agent-q3-pipelines":    os.environ.get("PIPELINES_SVC_ID",""),
               "mad-gambit-gui":        os.environ["GUI_SVC_ID"],
               "open-webui-gateway":    os.environ["WEBUI_SVC_ID"],
           }
@@ -193,8 +196,9 @@ jobs:
                   f.write(f"- **Status**: {'All OK' if not failed else 'Partial — failed: '+', '.join(failed)}\n\n")
                   f.write(f"| Endpoint | URL |\n|---|---|\n")
                   f.write(f"| Orchestrator | https://agent-q3-staging.up.railway.app |\n")
+                  f.write(f"| Pipelines | https://agent-q3-pipelines-staging.up.railway.app |\n")
+                  f.write(f"| Open WebUI | https://open-webui-gateway-staging.up.railway.app |\n")
                   f.write(f"| GUI | https://mad-gambit-gui-staging.up.railway.app |\n")
-                  f.write(f"| OpenWebUI | https://open-webui-gateway-staging.up.railway.app |\n")
 
           with open(os.environ.get("GITHUB_OUTPUT","/dev/null"),"a") as f:
               f.write(f"deployed={'true' if not failed else 'partial'}\n")
@@ -211,7 +215,8 @@ jobs:
 
           ENDPOINTS = {
               "Orchestrator": "https://agent-q3-staging.up.railway.app",
-              "GUI":          "https://mad-gambit-gui-staging.up.railway.app",
+              "Pipelines":    "https://agent-q3-pipelines-staging.up.railway.app",
+              "Open WebUI":   "https://open-webui-gateway-staging.up.railway.app",
           }
 
           print("Waiting 45s for containers to start...")
@@ -270,16 +275,20 @@ jobs:
               '| Service | URL |',
               '|---------|-----|',
               '| 🧠 Agent-Q3 Orchestrator | https://agent-q3-staging.up.railway.app |',
+              '| 🔗 Pipelines (multi-agent) | https://agent-q3-pipelines-staging.up.railway.app |',
+              '| 🌐 Open WebUI | https://open-webui-gateway-staging.up.railway.app |',
               '| 🖥️ GUI | https://mad-gambit-gui-staging.up.railway.app |',
-              '| 🌐 OpenWebUI Gateway | https://open-webui-gateway-staging.up.railway.app |',
               '',
               `**Branch:** \`${branch}\` | **Commit:** \`${sha}\``,
               '',
               '### Pre-merge checklist',
-              '- [ ] `POST /v1/tandem` — test tandem reasoning + coding in one call',
               '- [ ] `GET /health` — verify all 6 Ollama Cloud models report ready',
+              '- [ ] `POST /v1/tandem` — test tandem reasoning + coding in one call',
+              '- [ ] Pipelines service lists 3 agent pipelines (`GET /models`)',
+              '- [ ] Open WebUI shows 6 cloud models + 3 agent pipelines',
+              '- [ ] `agent-q3-router` pipeline routes code prompt → coder service',
+              '- [ ] `agent-q3-tandem` pipeline returns both reasoning + implementation sections',
               '- [ ] GUI loads and shows MAD Gambit AI branding',
-              '- [ ] OpenWebUI lists all 6 cloud models',
               '',
               '### Agent-triggered deploys',
               'The orchestrator can trigger this workflow via:',
