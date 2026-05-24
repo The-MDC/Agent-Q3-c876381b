@@ -69,6 +69,7 @@ def _parse_targets() -> dict[str, str]:
 
 class MonitorState:
     """In-memory rolling metrics + WebSocket pubsub."""
+
     def __init__(self):
         # 120 readings × 30s = 1 hour history per service
         self.metrics: dict[str, deque] = {}
@@ -139,9 +140,7 @@ async def _poll_one(name: str, base_url: str) -> dict:
 async def _poll_loop():
     """Background loop — polls every service every N seconds."""
     targets = _parse_targets()
-    log.info("monitor poll loop starting",
-             targets=list(targets.keys()),
-             interval=settings.kimi_k2_poll_interval_secs)
+    log.info("monitor poll loop starting", targets=list(targets.keys()), interval=settings.kimi_k2_poll_interval_secs)
     while True:
         try:
             results = await asyncio.gather(
@@ -158,13 +157,15 @@ async def _poll_loop():
 
                 # Transition event
                 if prev_status and prev_status != record["status"]:
-                    await state.emit({
-                        "kind": "transition",
-                        "service": name,
-                        "from": prev_status,
-                        "to": record["status"],
-                        "latency_ms": record["latency_ms"],
-                    })
+                    await state.emit(
+                        {
+                            "kind": "transition",
+                            "service": name,
+                            "from": prev_status,
+                            "to": record["status"],
+                            "latency_ms": record["latency_ms"],
+                        }
+                    )
                     # On down/degraded → trigger Kimi K2 analysis (rate-limited 5min/svc)
                     if record["status"] != "up" and settings.has_kimi_k2():
                         last = state.last_k2_analysis_ts.get(name, 0)
@@ -173,19 +174,20 @@ async def _poll_loop():
                             asyncio.create_task(_k2_anomaly_analysis(name, record))
                 # Latency anomaly
                 elif record["latency_ms"] and record["latency_ms"] > 10000:
-                    await state.emit({
-                        "kind": "slow_response",
-                        "service": name,
-                        "latency_ms": record["latency_ms"],
-                    })
+                    await state.emit(
+                        {
+                            "kind": "slow_response",
+                            "service": name,
+                            "latency_ms": record["latency_ms"],
+                        }
+                    )
         except Exception as e:
             log.error("poll loop iteration failed", error=str(e))
 
         await asyncio.sleep(settings.kimi_k2_poll_interval_secs)
 
 
-async def _call_kimi_k2(messages: list[dict], temperature: float = 0.4,
-                       max_tokens: int = 1024) -> dict:
+async def _call_kimi_k2(messages: list[dict], temperature: float = 0.4, max_tokens: int = 1024) -> dict:
     """
     Kimi K2 inference — tries Ollama Cloud first (kimi-k2:1t-cloud via signed-in
     ollama instance), then falls back to OpenRouter (moonshotai/kimi-k2).
@@ -210,9 +212,11 @@ async def _call_kimi_k2(messages: list[dict], temperature: float = 0.4,
                 r.raise_for_status()
                 raw = r.json()
                 return {
-                    "choices": [{
-                        "message": raw.get("message", {"role": "assistant", "content": ""}),
-                    }],
+                    "choices": [
+                        {
+                            "message": raw.get("message", {"role": "assistant", "content": ""}),
+                        }
+                    ],
                     "model": settings.kimi_k2_model,
                     "_via": "ollama-cloud",
                     "usage": {
@@ -221,8 +225,7 @@ async def _call_kimi_k2(messages: list[dict], temperature: float = 0.4,
                     },
                 }
         except Exception as e:
-            log.warning("ollama-cloud kimi-k2 failed, falling back to openrouter",
-                       error=str(e))
+            log.warning("ollama-cloud kimi-k2 failed, falling back to openrouter", error=str(e))
 
     # ── 2. OpenRouter fallback ──────────────────────────────────────────────
     if not settings.openrouter_api_key:
@@ -240,8 +243,7 @@ async def _call_kimi_k2(messages: list[dict], temperature: float = 0.4,
         "max_tokens": max_tokens,
     }
     async with httpx.AsyncClient(timeout=60) as client:
-        r = await client.post(f"{settings.kimi_k2_api_url}/chat/completions",
-                              headers=headers, json=payload)
+        r = await client.post(f"{settings.kimi_k2_api_url}/chat/completions", headers=headers, json=payload)
         r.raise_for_status()
         out = r.json()
         out["_via"] = "openrouter"
@@ -252,22 +254,30 @@ async def _k2_anomaly_analysis(service: str, record: dict) -> None:
     """Triggered when a service transitions to down/degraded."""
     try:
         snapshot = _build_snapshot()
-        resp = await _call_kimi_k2([
-            {"role": "system", "content": MONITOR_SYSTEM},
-            {"role": "user", "content":
-                f"ANOMALY: service `{service}` is {record['status']}.\n\n"
-                f"Latest reading: {record}\n\n"
-                f"Stack snapshot:\n{snapshot}\n\n"
-                f"Diagnose the most likely cause in ≤4 bullets. "
-                f"Suggest the single highest-leverage check the operator should run first."},
-        ], temperature=0.3, max_tokens=512)
+        resp = await _call_kimi_k2(
+            [
+                {"role": "system", "content": MONITOR_SYSTEM},
+                {
+                    "role": "user",
+                    "content": f"ANOMALY: service `{service}` is {record['status']}.\n\n"
+                    f"Latest reading: {record}\n\n"
+                    f"Stack snapshot:\n{snapshot}\n\n"
+                    f"Diagnose the most likely cause in ≤4 bullets. "
+                    f"Suggest the single highest-leverage check the operator should run first.",
+                },
+            ],
+            temperature=0.3,
+            max_tokens=512,
+        )
         msg = resp["choices"][0]["message"]["content"]
-        await state.emit({
-            "kind": "k2_insight",
-            "service": service,
-            "trigger": "anomaly",
-            "analysis": msg,
-        })
+        await state.emit(
+            {
+                "kind": "k2_insight",
+                "service": service,
+                "trigger": "anomaly",
+                "analysis": msg,
+            }
+        )
     except Exception as e:
         log.warning("kimi K2 anomaly analysis failed", error=str(e))
 
@@ -292,12 +302,15 @@ def _build_snapshot() -> dict:
 
 # ── FastAPI app ──────────────────────────────────────────────────────────────
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    log.info("Monitor starting",
-             kimi_k2_model=settings.kimi_k2_model,
-             k2_enabled=settings.has_kimi_k2(),
-             targets=_parse_targets())
+    log.info(
+        "Monitor starting",
+        kimi_k2_model=settings.kimi_k2_model,
+        k2_enabled=settings.has_kimi_k2(),
+        targets=_parse_targets(),
+    )
     await memory.connect()
     poll_task = asyncio.create_task(_poll_loop())
     yield
@@ -339,8 +352,10 @@ async def health():
     if settings.has_kimi_k2():
         try:
             async with httpx.AsyncClient(timeout=5) as client:
-                r = await client.get(f"{settings.kimi_k2_api_url}/models",
-                    headers={"Authorization": f"Bearer {settings.openrouter_api_key}"})
+                r = await client.get(
+                    f"{settings.kimi_k2_api_url}/models",
+                    headers={"Authorization": f"Bearer {settings.openrouter_api_key}"},
+                )
                 k2_ok = r.status_code == 200
         except Exception:
             pass
@@ -383,15 +398,20 @@ async def analyze(req: AnalyzeRequest):
         user_msg += f"\n\nCurrent stack snapshot:\n{_build_snapshot()}"
         user_msg += f"\n\nLast 10 events:\n{list(state.events)[:10]}"
     try:
-        resp = await _call_kimi_k2([
-            {"role": "system", "content": MONITOR_SYSTEM},
-            {"role": "user", "content": user_msg},
-        ], temperature=0.4, max_tokens=2048)
+        resp = await _call_kimi_k2(
+            [
+                {"role": "system", "content": MONITOR_SYSTEM},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.4,
+            max_tokens=2048,
+        )
     except Exception as e:
         raise HTTPException(503, detail=f"Kimi K2 call failed: {e}")
     content = resp["choices"][0]["message"]["content"]
-    await state.emit({"kind": "k2_insight", "trigger": "user_query",
-                     "query": req.query[:200], "analysis": content[:200]})
+    await state.emit(
+        {"kind": "k2_insight", "trigger": "user_query", "query": req.query[:200], "analysis": content[:200]}
+    )
     return {
         "model": settings.kimi_k2_model,
         "analysis": content,
@@ -405,9 +425,13 @@ async def ws_live(ws: WebSocket):
     q: asyncio.Queue = asyncio.Queue(maxsize=64)
     state.subscribers.add(q)
     try:
-        await ws.send_json({"kind": "hello",
-                            "tracked": list(state.metrics.keys()),
-                            "uptime_secs": round(time.time() - state.started_at, 1)})
+        await ws.send_json(
+            {
+                "kind": "hello",
+                "tracked": list(state.metrics.keys()),
+                "uptime_secs": round(time.time() - state.started_at, 1),
+            }
+        )
         while True:
             event = await q.get()
             await ws.send_json(event)

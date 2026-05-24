@@ -13,7 +13,7 @@ Falls back to a no-op in-memory store if REDIS_URL is unset.
 
 import json
 import time
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
@@ -24,11 +24,12 @@ log = structlog.get_logger(__name__)
 
 class _InMemoryFallback:
     """Drop-in async stub used when REDIS_URL is unset."""
+
     def __init__(self):
         self._store: dict[str, tuple[float, str]] = {}
         self._lists: dict[str, list] = {}
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         item = self._store.get(key)
         if not item:
             return None
@@ -56,14 +57,14 @@ class _InMemoryFallback:
         lst = self._lists.get(key, [])
         if stop == -1:
             return lst[start:]
-        return lst[start:stop + 1]
+        return lst[start : stop + 1]
 
     async def ltrim(self, key: str, start: int, stop: int) -> None:
         lst = self._lists.get(key, [])
         if stop == -1:
             self._lists[key] = lst[start:]
         else:
-            self._lists[key] = lst[start:stop + 1]
+            self._lists[key] = lst[start : stop + 1]
 
     async def ping(self) -> bool:
         return True
@@ -83,6 +84,7 @@ class Memory:
         if settings.redis_url:
             try:
                 from redis.asyncio import from_url
+
                 self._client = from_url(settings.redis_url, decode_responses=True)
                 await self._client.ping()
                 self._backend = "redis"
@@ -104,7 +106,7 @@ class Memory:
 
     # ── Typed helpers ────────────────────────────────────────────────────────
 
-    async def cache_get(self, key: str) -> Optional[Any]:
+    async def cache_get(self, key: str) -> Any | None:
         raw = await self._client.get(f"cache:{key}")
         return json.loads(raw) if raw else None
 

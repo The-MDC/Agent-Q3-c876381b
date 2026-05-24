@@ -2,8 +2,9 @@
 Unit tests — Agent-Q3 orchestrator
 Tests classifier, router logic, and schema validation without containers.
 """
-from orchestrator.models import classify_task, Message, ChatRequest
+
 from orchestrator.config import Settings
+from orchestrator.models import ChatRequest, Message, classify_task
 
 
 def msg(content: str, role: str = "user") -> Message:
@@ -57,9 +58,5 @@ class TestChatRequest:
         assert req.force_backend is None
 
     def test_tandem_request_structure(self):
-        req = ChatRequest(
-            messages=[msg("implement a prediction market contract")],
-            model_role="auto",
-            max_tokens=4096
-        )
+        req = ChatRequest(messages=[msg("implement a prediction market contract")], model_role="auto", max_tokens=4096)
         assert req.max_tokens == 4096

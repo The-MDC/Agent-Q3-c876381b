@@ -5,30 +5,31 @@ Kimi uses this graph to decide:
 2. Which agents to spawn?
 3. How to synthesize their results?
 """
+
 from __future__ import annotations
 
-from typing import Optional, TypedDict
-import structlog
-from langgraph.graph import StateGraph, END
-from langgraph.types import Send
+from typing import TypedDict
 
-from ..config import settings
-from ..router import ComputeRouter
+import structlog
+from langgraph.graph import END, StateGraph
+
 from ..memory.agent_memory import get_memory_store
+from ..router import ComputeRouter
 
 logger = structlog.get_logger(__name__)
 
 
 class AgentState(TypedDict):
     """State for multi-agent workflow."""
+
     conversation_id: str
     query: str
     context: dict
     should_spawn: bool
     spawned_agents: list[str]
-    reasoner_result: Optional[str]
-    coder_result: Optional[str]
-    synthesis: Optional[str]
+    reasoner_result: str | None
+    coder_result: str | None
+    synthesis: str | None
     final_response: str
 
 
@@ -66,7 +67,7 @@ class DecisionGraph:
             {
                 True: "spawn_reasoner",
                 False: "single_agent",
-            }
+            },
         )
 
         graph.set_entry_point("analyze_query")
@@ -76,9 +77,18 @@ class DecisionGraph:
         """Analyze query complexity."""
         query = state["query"]
         complexity_indicators = [
-            "research", "analyze", "investigate", "compare",
-            "implement", "debug", "refactor", "optimize",
-            "design", "architecture", "complex", "difficult"
+            "research",
+            "analyze",
+            "investigate",
+            "compare",
+            "implement",
+            "debug",
+            "refactor",
+            "optimize",
+            "design",
+            "architecture",
+            "complex",
+            "difficult",
         ]
         should_spawn = any(ind in query.lower() for ind in complexity_indicators)
 
@@ -158,13 +168,13 @@ class DecisionGraph:
         synthesis_prompt = f"""
 You are Kimi, a hybrid reasoning model. Two agents have analyzed this task:
 
-TASK: {state['query']}
+TASK: {state["query"]}
 
 REASONER ANALYSIS:
-{state.get('reasoner_result', 'No response')}
+{state.get("reasoner_result", "No response")}
 
 CODER ANALYSIS:
-{state.get('coder_result', 'No response')}
+{state.get("coder_result", "No response")}
 
 Synthesize these analyses into a coherent, actionable response.
 """
@@ -227,7 +237,7 @@ Synthesize these analyses into a coherent, actionable response.
 
 
 # Singleton
-_decision_graph: Optional[DecisionGraph] = None
+_decision_graph: DecisionGraph | None = None
 
 
 def get_decision_graph(compute_router: ComputeRouter) -> DecisionGraph:
@@ -236,4 +246,3 @@ def get_decision_graph(compute_router: ComputeRouter) -> DecisionGraph:
     if _decision_graph is None:
         _decision_graph = DecisionGraph(compute_router)
     return _decision_graph
-

@@ -2,11 +2,11 @@
 
 Kimi (Support model) can spawn sub-agents (Reasoner, Coder) for complex tasks.
 """
+
 from __future__ import annotations
 
 import asyncio
-import json
-from typing import Optional
+
 import structlog
 
 from ..config import settings
@@ -89,9 +89,7 @@ class MultiAgentRouter:
         """Spawn Reasoner + Coder in parallel."""
         reasoner_task = self.spawn_reasoner(task)
         coder_task = self.spawn_coder(task)
-        reasoner_result, coder_result = await asyncio.gather(
-            reasoner_task, coder_task
-        )
+        reasoner_result, coder_result = await asyncio.gather(reasoner_task, coder_task)
         return {
             "spawned_agents": ["reasoner", "coder"],
             "results": {
@@ -103,7 +101,7 @@ class MultiAgentRouter:
     async def route(
         self,
         query: str,
-        context: Optional[dict] = None,
+        context: dict | None = None,
         force_single_agent: bool = False,
     ) -> dict:
         """Route request through multi-agent orchestration.
@@ -113,10 +111,7 @@ class MultiAgentRouter:
         """
         context = context or {}
 
-        should_spawn = (
-            not force_single_agent
-            and await self.should_spawn_agents(query, context)
-        )
+        should_spawn = not force_single_agent and await self.should_spawn_agents(query, context)
 
         if should_spawn:
             logger.info("spawning sub-agents", query=query[:100])
@@ -128,10 +123,10 @@ You are Kimi, a hybrid reasoning model. Two agents have analyzed this task:
 TASK: {query}
 
 REASONER ANALYSIS:
-{agent_results['results']['reasoner'].get('response', 'No response')}
+{agent_results["results"]["reasoner"].get("response", "No response")}
 
 CODER ANALYSIS:
-{agent_results['results']['coder'].get('response', 'No response')}
+{agent_results["results"]["coder"].get("response", "No response")}
 
 Synthesize these analyses into a coherent, actionable response.
 """

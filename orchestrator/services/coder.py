@@ -11,24 +11,24 @@ Endpoints:
 
 from contextlib import asynccontextmanager
 
-import structlog
 import httpx
+import structlog
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from ..config import settings
-from ..router import router, Backend, LOCAL_MODEL_MAP, HF_MODEL_MAP
 from ..memory import memory
-from ..skills import skills
+from ..models import HERMES_SYSTEM, ChatRequest, ChatResponse
 from ..plugins import plugins
-from ..models import ChatRequest, ChatResponse, CODER_SYSTEM, HERMES_SYSTEM
+from ..router import HF_MODEL_MAP, LOCAL_MODEL_MAP, Backend, router
+from ..skills import skills
 
 log = structlog.get_logger(__name__)
 
 # Register the dedicated coder role at module load
 LOCAL_MODEL_MAP["coder_dedicated"] = lambda: settings.coder_dedicated_model
-HF_MODEL_MAP["coder_dedicated"]    = lambda: settings.hf_coder_model
+HF_MODEL_MAP["coder_dedicated"] = lambda: settings.hf_coder_model
 
 CODER_DEDICATED_SYSTEM = """You are a senior software engineer using Qwen3-Coder.
 Write correct, idiomatic, production-grade code.
@@ -156,10 +156,12 @@ async def coder_review(request: ChatRequest):
         {"role": "system", "content": HERMES_SYSTEM},
         *[m.model_dump() for m in request.messages],
         {"role": "assistant", "content": f"[Qwen3-Coder draft]\n{code_out}"},
-        {"role": "user", "content":
-            "Review the code above. Identify bugs, edge cases, security issues, "
+        {
+            "role": "user",
+            "content": "Review the code above. Identify bugs, edge cases, security issues, "
             "and idiom violations. If the code is correct, say so and explain why. "
-            "If it needs changes, output the corrected version."},
+            "If it needs changes, output the corrected version.",
+        },
     ]
     try:
         review_result = await router.route(
@@ -175,8 +177,8 @@ async def coder_review(request: ChatRequest):
     return {
         "draft": code_out,
         "review": review_out,
-        "coder_model":   write_result.get("_model_used"),
-        "review_model":  review_result.get("_model_used"),
+        "coder_model": write_result.get("_model_used"),
+        "review_model": review_result.get("_model_used"),
         "coder_backend": write_result.get("_backend_used"),
         "review_backend": review_result.get("_backend_used"),
     }

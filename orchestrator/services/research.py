@@ -21,33 +21,29 @@ Endpoints:
 """
 
 from contextlib import asynccontextmanager
-from typing import Optional
 
-import structlog
 import httpx
+import structlog
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
 from ..config import settings
-from ..router import router, Backend
-from ..memory import memory
-from ..skills import skills
-from ..plugins import plugins
-from ..models import REASONER_SYSTEM, CODER_SYSTEM, HERMES_SYSTEM
+from ..models import HERMES_SYSTEM, REASONER_SYSTEM
+from ..router import router
+from ..tools import free_search as fs
 
 # Import existing research tools
 from ..tools import perplexity_search as pplx
-from ..tools import web_search as ws
-from ..tools import free_search as fs
 from ..tools import prediction_markets as pm
-from ..tools import mcp_search as mcps
+from ..tools import web_search as ws
 
 log = structlog.get_logger(__name__)
 
 
 # ── Request schemas ──────────────────────────────────────────────────────────
+
 
 class DeepResearchRequest(BaseModel):
     query: str
@@ -114,8 +110,8 @@ async def root():
         "service": "Agent-Q3 Deep Research",
         "providers": {
             "perplexity": settings.has_perplexity(),
-            "exa":        settings.has_exa(),
-            "tavily":     settings.has_tavily(),
+            "exa": settings.has_exa(),
+            "tavily": settings.has_tavily(),
             "free_tools": True,
             "polymarket": True,
         },
@@ -137,13 +133,14 @@ async def health():
         "ollama": ok,
         "providers": {
             "perplexity": settings.has_perplexity(),
-            "exa":        settings.has_exa(),
-            "tavily":     settings.has_tavily(),
+            "exa": settings.has_exa(),
+            "tavily": settings.has_tavily(),
         },
     }
 
 
 # ── /v1/research/deep ─────────────────────────────────────────────────────────
+
 
 @app.post("/v1/research/deep")
 async def deep_research(req: DeepResearchRequest):
@@ -154,7 +151,8 @@ async def deep_research(req: DeepResearchRequest):
     if req.use_perplexity and settings.has_perplexity():
         try:
             results["providers"]["perplexity"] = await pplx.deep_research(
-                req.query, recency=req.recency,
+                req.query,
+                recency=req.recency,
             )
         except Exception as e:
             log.warning("perplexity failed", error=str(e))
@@ -189,6 +187,7 @@ async def deep_research(req: DeepResearchRequest):
 
 # ── /v1/research/scrape ───────────────────────────────────────────────────────
 
+
 @app.post("/v1/research/scrape")
 async def scrape(req: ScrapeRequest):
     """Free page scrape via Jina Reader (r.jina.ai)."""
@@ -203,6 +202,7 @@ async def scrape(req: ScrapeRequest):
 
 
 # ── /v1/research/quant ────────────────────────────────────────────────────────
+
 
 @app.post("/v1/research/quant")
 async def quant(req: QuantRequest):
@@ -219,6 +219,7 @@ async def quant(req: QuantRequest):
 
 
 # ── /v1/research/synthesize ───────────────────────────────────────────────────
+
 
 @app.post("/v1/research/synthesize")
 async def synthesize(req: SynthesizeRequest):
@@ -245,11 +246,13 @@ async def synthesize(req: SynthesizeRequest):
     # 2. Kimi-VL reads
     kimi_msgs = [
         {"role": "system", "content": REASONER_SYSTEM},
-        {"role": "user", "content":
-            f"Research query: {req.query}\n\n"
+        {
+            "role": "user",
+            "content": f"Research query: {req.query}\n\n"
             f"Raw multi-provider results:\n{raw_dump}\n\n"
             f"Extract the 5-10 most important findings as concise bullets. "
-            f"Tag each with [source: provider]."},
+            f"Tag each with [source: provider].",
+        },
     ]
     try:
         kimi_result = await router.route(
@@ -258,18 +261,23 @@ async def synthesize(req: SynthesizeRequest):
             temperature=0.4,
             max_tokens=2048,
         )
-        kimi_findings = kimi_result.get("message", {}).get("content", "") if isinstance(
-            kimi_result.get("message"), dict) else str(kimi_result.get("message", ""))
+        kimi_findings = (
+            kimi_result.get("message", {}).get("content", "")
+            if isinstance(kimi_result.get("message"), dict)
+            else str(kimi_result.get("message", ""))
+        )
     except Exception as e:
         raise HTTPException(503, detail=f"Kimi-VL findings step failed: {e}")
 
     # 3. Hermes3 synthesizes
     hermes_msgs = [
         {"role": "system", "content": HERMES_SYSTEM},
-        {"role": "user", "content":
-            f"Query: {req.query}\n\nKey findings extracted:\n{kimi_findings}\n\n"
+        {
+            "role": "user",
+            "content": f"Query: {req.query}\n\nKey findings extracted:\n{kimi_findings}\n\n"
             f"Synthesize these into a structured analysis: thesis, supporting evidence, "
-            f"counterpoints, unknowns. Flag any source conflicts explicitly."},
+            f"counterpoints, unknowns. Flag any source conflicts explicitly.",
+        },
     ]
     try:
         hermes_result = await router.route(
@@ -278,19 +286,24 @@ async def synthesize(req: SynthesizeRequest):
             temperature=0.4,
             max_tokens=2048,
         )
-        hermes_synthesis = hermes_result.get("message", {}).get("content", "") if isinstance(
-            hermes_result.get("message"), dict) else str(hermes_result.get("message", ""))
+        hermes_synthesis = (
+            hermes_result.get("message", {}).get("content", "")
+            if isinstance(hermes_result.get("message"), dict)
+            else str(hermes_result.get("message", ""))
+        )
     except Exception as e:
         raise HTTPException(503, detail=f"Hermes synthesis failed: {e}")
 
     # 4. Qwen3-48B final report
     final_msgs = [
         {"role": "system", "content": RESEARCH_SYSTEM},
-        {"role": "user", "content":
-            f"Query: {req.query}\n\nFindings:\n{kimi_findings}\n\n"
+        {
+            "role": "user",
+            "content": f"Query: {req.query}\n\nFindings:\n{kimi_findings}\n\n"
             f"Analysis:\n{hermes_synthesis}\n\n"
             f"Produce the final research brief. Be evidence-grounded, cite inline, "
-            f"end with a numbered source list."},
+            f"end with a numbered source list.",
+        },
     ]
     try:
         final_result = await router.route(
@@ -299,21 +312,24 @@ async def synthesize(req: SynthesizeRequest):
             temperature=0.3,
             max_tokens=4096,
         )
-        report = final_result.get("message", {}).get("content", "") if isinstance(
-            final_result.get("message"), dict) else str(final_result.get("message", ""))
+        report = (
+            final_result.get("message", {}).get("content", "")
+            if isinstance(final_result.get("message"), dict)
+            else str(final_result.get("message", ""))
+        )
     except Exception as e:
         raise HTTPException(503, detail=f"Final report failed: {e}")
 
     return {
         "query": req.query,
-        "findings":  kimi_findings,
-        "analysis":  hermes_synthesis,
-        "report":    report,
+        "findings": kimi_findings,
+        "analysis": hermes_synthesis,
+        "report": report,
         "providers_used": list(gather["providers"].keys()),
-        "quant":     quant_block,
+        "quant": quant_block,
         "pipeline": {
-            "stage1_kimi":   kimi_result.get("_model_used"),
+            "stage1_kimi": kimi_result.get("_model_used"),
             "stage2_hermes": hermes_result.get("_model_used"),
-            "stage3_qwen":   final_result.get("_model_used"),
+            "stage3_qwen": final_result.get("_model_used"),
         },
     }

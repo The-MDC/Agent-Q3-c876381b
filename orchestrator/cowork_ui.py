@@ -1,4 +1,3 @@
-from __future__ import annotations
 """
 cowork_ui.py — Claude Cowork / Claude Desktop integration endpoints.
 
@@ -24,16 +23,18 @@ MCP Tools exposed to Claude Cowork:
   - web_search         — multi-provider web search
   - market_data        — Polymarket prediction market data
 """
+
+from __future__ import annotations
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Any, Optional, List
 
 from orchestrator.config import settings
 from orchestrator.router import ComputeRouter
 from orchestrator.tools.memory_store import MemoryStore
 from orchestrator.tools.perplexity_search import perplexity_deep_research
-from orchestrator.tools.web_search import multi_search
 from orchestrator.tools.prediction_markets import get_polymarket_markets
+from orchestrator.tools.web_search import multi_search
 
 router = APIRouter(prefix="/cowork", tags=["cowork"])
 compute = ComputeRouter()
@@ -52,9 +53,14 @@ CAPABILITIES = {
         "coder": settings.coder_model,
     },
     "tools": [
-        "agent_q3_reason", "agent_q3_research", "agent_q3_support",
-        "memory_save", "memory_search",
-        "deep_research", "web_search", "market_data",
+        "agent_q3_reason",
+        "agent_q3_research",
+        "agent_q3_support",
+        "memory_save",
+        "memory_search",
+        "deep_research",
+        "web_search",
+        "market_data",
     ],
     "mcp_endpoint": "/cowork/mcp",
     "openai_compat_endpoint": "/cowork/chat",
@@ -73,34 +79,28 @@ MCP_TOOLS = [
             "properties": {
                 "prompt": {"type": "string", "description": "The prompt to reason about"},
                 "system": {"type": "string", "description": "Optional system prompt"},
-                "temperature": {"type": "number", "default": 0.7}
+                "temperature": {"type": "number", "default": 0.7},
             },
-            "required": ["prompt"]
-        }
+            "required": ["prompt"],
+        },
     },
     {
         "name": "agent_q3_research",
         "description": "Send a prompt to QwQ-32B deep research model (131K context). Best for: long-form research, code analysis, multi-step reasoning.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "prompt": {"type": "string"},
-                "system": {"type": "string"}
-            },
-            "required": ["prompt"]
-        }
+            "properties": {"prompt": {"type": "string"}, "system": {"type": "string"}},
+            "required": ["prompt"],
+        },
     },
     {
         "name": "agent_q3_support",
         "description": "Send a prompt to Qwen3-8B Kimi-K2 distilled support model. Best for: fast instruct, hybrid reasoning, quick answers.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "prompt": {"type": "string"},
-                "system": {"type": "string"}
-            },
-            "required": ["prompt"]
-        }
+            "properties": {"prompt": {"type": "string"}, "system": {"type": "string"}},
+            "required": ["prompt"],
+        },
     },
     {
         "name": "memory_save",
@@ -110,63 +110,52 @@ MCP_TOOLS = [
             "properties": {
                 "text": {"type": "string", "description": "Memory content to save"},
                 "tags": {"type": "array", "items": {"type": "string"}},
-                "source": {"type": "string", "default": "cowork"}
+                "source": {"type": "string", "default": "cowork"},
             },
-            "required": ["text"]
-        }
+            "required": ["text"],
+        },
     },
     {
         "name": "memory_search",
         "description": "Semantic search over Agent-Q3 long-term memory.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "query": {"type": "string"},
-                "k": {"type": "integer", "default": 5}
-            },
-            "required": ["query"]
-        }
+            "properties": {"query": {"type": "string"}, "k": {"type": "integer", "default": 5}},
+            "required": ["query"],
+        },
     },
     {
         "name": "deep_research",
         "description": "Run Perplexity sonar-deep-research for comprehensive multi-step web research with citations.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "query": {"type": "string"},
-                "model": {"type": "string", "default": "sonar-deep-research"}
-            },
-            "required": ["query"]
-        }
+            "properties": {"query": {"type": "string"}, "model": {"type": "string", "default": "sonar-deep-research"}},
+            "required": ["query"],
+        },
     },
     {
         "name": "web_search",
         "description": "Multi-provider web search (Exa, Tavily, Brave, DuckDuckGo fallback).",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "query": {"type": "string"},
-                "num_results": {"type": "integer", "default": 10}
-            },
-            "required": ["query"]
-        }
+            "properties": {"query": {"type": "string"}, "num_results": {"type": "integer", "default": 10}},
+            "required": ["query"],
+        },
     },
     {
         "name": "market_data",
         "description": "Fetch Polymarket prediction market data for research and conviction analysis.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "query": {"type": "string"},
-                "limit": {"type": "integer", "default": 10}
-            },
-            "required": []
-        }
+            "properties": {"query": {"type": "string"}, "limit": {"type": "integer", "default": 10}},
+            "required": [],
+        },
     },
 ]
 
 
 # -- Routes ------------------------------------------------------------------
+
 
 @router.get("/health")
 async def cowork_health():
@@ -252,6 +241,7 @@ async def mcp_tool_call(call: MCPToolCall):
 
 # -- Memory convenience routes -----------------------------------------------
 
+
 @router.get("/memory/recent")
 async def memory_recent(n: int = 10):
     return await memory.get_recent(n)
@@ -259,7 +249,7 @@ async def memory_recent(n: int = 10):
 
 class MemorySaveRequest(BaseModel):
     text: str
-    tags: List[str] = []
+    tags: list[str] = []
     source: str = "cowork"
 
 

@@ -4,12 +4,13 @@ Models & task classifier — Agent-Q3
 Classifies incoming prompts → routes to Reasoner (Gemma4-E4B) or Coder (Qwen3.5-4B)
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional, Literal
 import re
+from typing import Literal
 
+from pydantic import BaseModel, Field
 
 # ── Request / Response schemas ────────────────────────────────────────────────
+
 
 class Message(BaseModel):
     role: Literal["system", "user", "assistant"]
@@ -18,8 +19,8 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[Message]
-    model_role: Optional[Literal["reasoner", "coder", "auto"]] = "auto"
-    force_backend: Optional[Literal["local", "huggingface", "runpod", "openrouter"]] = None
+    model_role: Literal["reasoner", "coder", "auto"] | None = "auto"
+    force_backend: Literal["local", "huggingface", "runpod", "openrouter"] | None = None
     stream: bool = False
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=2048, ge=1, le=32768)
@@ -58,7 +59,7 @@ CODER_SIGNALS = re.compile(
     r"compile|build|deploy|dockerfile|yaml|json|"
     r"solidity|foundry|forge|cast|abi|erc-?20|erc-?721"
     r")\b",
-    re.IGNORECASE
+    re.IGNORECASE,
 )
 
 # Keywords that strongly indicate REASONING / INSTRUCT tasks → Gemma4-E4B
@@ -72,7 +73,7 @@ REASONER_SIGNALS = re.compile(
     r"market|prediction|probability|sentiment|"
     r"write .*(essay|report|memo|plan|proposal)"
     r")\b",
-    re.IGNORECASE
+    re.IGNORECASE,
 )
 
 
@@ -81,11 +82,9 @@ def classify_task(messages: list[Message]) -> Literal["reasoner", "coder"]:
     Heuristic classifier: examines last user message to pick the right model.
     Coder wins on ties (faster for mixed tasks).
     """
-    text = " ".join(
-        m.content for m in messages if m.role in ("user", "system")
-    )[-2000:]  # last 2000 chars is enough
+    text = " ".join(m.content for m in messages if m.role in ("user", "system"))[-2000:]  # last 2000 chars is enough
 
-    coder_hits    = len(CODER_SIGNALS.findall(text))
+    coder_hits = len(CODER_SIGNALS.findall(text))
     reasoner_hits = len(REASONER_SIGNALS.findall(text))
 
     if coder_hits > reasoner_hits:

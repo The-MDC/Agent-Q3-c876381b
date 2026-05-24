@@ -3,7 +3,9 @@ mcp_search.py — MCP server discovery for both Reasoner + Coder agents.
 Ported from perplexity-v.1/lib/tools/mcp-search.ts (Smithery API).
 Also scans Glama registry as secondary source.
 """
+
 import httpx
+
 from orchestrator.config import settings
 
 
@@ -23,8 +25,7 @@ async def search_mcp_servers(query: str, limit: int = 10) -> dict:
                 r = await client.get(
                     "https://registry.smithery.ai/servers",
                     params={"q": query, "limit": limit},
-                    headers={"Authorization": f"Bearer {smithery_key}",
-                             "Content-Type": "application/json"},
+                    headers={"Authorization": f"Bearer {smithery_key}", "Content-Type": "application/json"},
                 )
                 if r.status_code == 200:
                     data = r.json()
@@ -44,14 +45,16 @@ async def search_mcp_servers(query: str, limit: int = 10) -> dict:
                                     srv["connections"] = details.get("connections", [])
                             except Exception:
                                 pass
-                        results.append({
-                            "source": "smithery",
-                            "name": srv.get("displayName", srv.get("qualifiedName", "?")),
-                            "qualified_name": qname,
-                            "description": srv.get("description", "")[:120],
-                            "deployment_url": srv.get("deploymentUrl"),
-                            "connections": srv.get("connections", []),
-                        })
+                        results.append(
+                            {
+                                "source": "smithery",
+                                "name": srv.get("displayName", srv.get("qualifiedName", "?")),
+                                "qualified_name": qname,
+                                "description": srv.get("description", "")[:120],
+                                "deployment_url": srv.get("deploymentUrl"),
+                                "connections": srv.get("connections", []),
+                            }
+                        )
         except Exception as e:
             errors.append(f"Smithery: {e}")
 
@@ -68,12 +71,14 @@ async def search_mcp_servers(query: str, limit: int = 10) -> dict:
                 servers = data.get("servers", data) if isinstance(data, dict) else data
                 if isinstance(servers, list):
                     for s in servers[:8]:
-                        results.append({
-                            "source": "glama",
-                            "name": s.get("name", "?"),
-                            "description": s.get("description", "")[:120],
-                            "url": s.get("url", s.get("githubUrl", "")),
-                        })
+                        results.append(
+                            {
+                                "source": "glama",
+                                "name": s.get("name", "?"),
+                                "description": s.get("description", "")[:120],
+                                "url": s.get("url", s.get("githubUrl", "")),
+                            }
+                        )
     except Exception as e:
         errors.append(f"Glama: {e}")
 

@@ -18,7 +18,6 @@ import json
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Optional
 
 import httpx
 import structlog
@@ -31,17 +30,16 @@ MCP_CONFIG_PATH = Path("/app/.mcp.json")
 class MCPHTTPClient:
     """Single MCP server connection over streamable HTTP (JSON-RPC 2.0)."""
 
-    def __init__(self, name: str, url: str, auth_header: dict[str, str] | None = None,
-                 description: str = ""):
+    def __init__(self, name: str, url: str, auth_header: dict[str, str] | None = None, description: str = ""):
         self.name = name
         self.url = url.rstrip("/")
         self.description = description
         self.auth_header = auth_header or {}
-        self._session_id: Optional[str] = None
+        self._session_id: str | None = None
         self._tools_cache: list[dict] = []
         self._client = httpx.AsyncClient(timeout=30)
         self._initialized: bool = False
-        self._last_error: Optional[str] = None
+        self._last_error: str | None = None
 
     async def _rpc(self, method: str, params: dict | None = None) -> dict:
         """Send a JSON-RPC request and return the response."""
@@ -80,11 +78,14 @@ class MCPHTTPClient:
 
     async def initialize(self) -> bool:
         try:
-            resp = await self._rpc("initialize", {
-                "protocolVersion": "2025-06-18",
-                "capabilities": {"roots": {"listChanged": False}, "sampling": {}},
-                "clientInfo": {"name": "agent-q3-mcp-bridge", "version": "1.0.0"},
-            })
+            resp = await self._rpc(
+                "initialize",
+                {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {"roots": {"listChanged": False}, "sampling": {}},
+                    "clientInfo": {"name": "agent-q3-mcp-bridge", "version": "1.0.0"},
+                },
+            )
             if "error" in resp:
                 self._last_error = str(resp["error"])
                 log.warning("MCP init failed", server=self.name, error=resp["error"])
@@ -114,10 +115,13 @@ class MCPHTTPClient:
 
     async def call_tool(self, tool: str, args: dict | None = None) -> dict:
         try:
-            resp = await self._rpc("tools/call", {
-                "name": tool,
-                "arguments": args or {},
-            })
+            resp = await self._rpc(
+                "tools/call",
+                {
+                    "name": tool,
+                    "arguments": args or {},
+                },
+            )
             if "error" in resp:
                 return {"error": resp["error"]}
             return resp.get("result", {})
@@ -176,6 +180,7 @@ class MCPRegistry:
             auth_block = conf.get("auth", {})
             if auth_block.get("type") == "bearer":
                 import os
+
                 env_key = auth_block.get("env", "")
                 token = os.getenv(env_key, "") if env_key else ""
                 if token:
@@ -184,8 +189,7 @@ class MCPRegistry:
                     self._skipped[name] = f"missing env {env_key}"
                     continue
 
-            client = MCPHTTPClient(name=name, url=url, auth_header=auth,
-                                   description=conf.get("description", ""))
+            client = MCPHTTPClient(name=name, url=url, auth_header=auth, description=conf.get("description", ""))
             self._clients[name] = client
             init_tasks.append(self._init_one(client))
 
@@ -193,9 +197,7 @@ class MCPRegistry:
             await asyncio.gather(*init_tasks, return_exceptions=True)
 
         self._loaded_at = time.time()
-        log.info("MCP registry loaded",
-                 active=list(self._clients.keys()),
-                 skipped=list(self._skipped.keys()))
+        log.info("MCP registry loaded", active=list(self._clients.keys()), skipped=list(self._skipped.keys()))
         return {
             "servers": list(self._clients.keys()),
             "skipped": self._skipped,
@@ -212,8 +214,7 @@ class MCPRegistry:
     async def call(self, server: str, tool: str, args: dict | None = None) -> dict:
         client = self._clients.get(server)
         if not client:
-            return {"error": f"unknown MCP server '{server}'",
-                    "available": list(self._clients.keys())}
+            return {"error": f"unknown MCP server '{server}'", "available": list(self._clients.keys())}
         return await client.call_tool(tool, args)
 
     async def health(self) -> dict:

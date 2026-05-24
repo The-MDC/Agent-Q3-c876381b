@@ -10,36 +10,36 @@ Models:
   sonar-reasoning-pro  — best reasoning + search, 127K ctx
   sonar-deep-research  — multi-step research, 128K ctx
 """
+
+from typing import Literal
+
 import httpx
-from typing import Literal, Optional
+
 from orchestrator.config import settings
 
 PPLX_MODELS = {
-    "sonar":               {"ctx": 127_000, "cost_per_1k": 0.001, "supports_ctx_size": False},
-    "sonar-pro":           {"ctx": 200_000, "cost_per_1k": 0.003, "supports_ctx_size": True},
-    "sonar-reasoning":     {"ctx": 127_000, "cost_per_1k": 0.005, "supports_ctx_size": False},
+    "sonar": {"ctx": 127_000, "cost_per_1k": 0.001, "supports_ctx_size": False},
+    "sonar-pro": {"ctx": 200_000, "cost_per_1k": 0.003, "supports_ctx_size": True},
+    "sonar-reasoning": {"ctx": 127_000, "cost_per_1k": 0.005, "supports_ctx_size": False},
     "sonar-reasoning-pro": {"ctx": 127_000, "cost_per_1k": 0.008, "supports_ctx_size": False},
     "sonar-deep-research": {"ctx": 128_000, "cost_per_1k": 0.015, "supports_ctx_size": False},
 }
 
-PplxModel = Literal[
-    "sonar", "sonar-pro", "sonar-reasoning",
-    "sonar-reasoning-pro", "sonar-deep-research"
-]
+PplxModel = Literal["sonar", "sonar-pro", "sonar-reasoning", "sonar-reasoning-pro", "sonar-deep-research"]
 
 
 async def perplexity_search(
     query: str,
     model: PplxModel = "sonar-pro",
-    system_prompt: Optional[str] = None,
-    conversation_history: Optional[list[dict]] = None,
+    system_prompt: str | None = None,
+    conversation_history: list[dict] | None = None,
     max_tokens: int = 2048,
     temperature: float = 0.2,
     return_images: bool = False,
     return_related_questions: bool = True,
-    search_domain_filter: Optional[list[str]] = None,
-    search_recency_filter: Optional[Literal["day","week","month","year"]] = None,
-    search_context_size: Literal["low","medium","high"] = "medium",
+    search_domain_filter: list[str] | None = None,
+    search_recency_filter: Literal["day", "week", "month", "year"] | None = None,
+    search_context_size: Literal["low", "medium", "high"] = "medium",
 ) -> dict:
     """
     Call Perplexity Sonar API.  Used by:
@@ -90,19 +90,19 @@ async def perplexity_search(
 
         choice = data["choices"][0]
         answer = choice["message"]["content"]
-        citations    = data.get("citations", [])
-        images       = data.get("images", [])
-        related_qs   = data.get("related_questions", [])
-        usage        = data.get("usage", {})
+        citations = data.get("citations", [])
+        images = data.get("images", [])
+        related_qs = data.get("related_questions", [])
+        usage = data.get("usage", {})
 
         return {
-            "answer":             answer,
-            "citations":          citations,
-            "images":             images,
-            "related_questions":  related_qs,
-            "model":              model,
-            "usage":              usage,
-            "cost_estimate_usd":  (usage.get("total_tokens", 0) / 1000) * model_meta["cost_per_1k"],
+            "answer": answer,
+            "citations": citations,
+            "images": images,
+            "related_questions": related_qs,
+            "model": model,
+            "usage": usage,
+            "cost_estimate_usd": (usage.get("total_tokens", 0) / 1000) * model_meta["cost_per_1k"],
         }
     except httpx.HTTPStatusError as e:
         return {"error": f"Perplexity API {e.response.status_code}: {e.response.text[:200]}", "query": query}
@@ -112,7 +112,8 @@ async def perplexity_search(
 
 # ── Convenience wrappers for common agent tasks ───────────────────────────────
 
-async def deep_research(topic: str, recency: Optional[Literal["day","week","month","year"]] = None) -> dict:
+
+async def deep_research(topic: str, recency: Literal["day", "week", "month", "year"] | None = None) -> dict:
     """Reasoner agent: multi-step deep research on a topic."""
     return await perplexity_search(
         query=topic,
@@ -124,14 +125,21 @@ async def deep_research(topic: str, recency: Optional[Literal["day","week","mont
     )
 
 
-async def doc_lookup(query: str, domains: Optional[list[str]] = None) -> dict:
+async def doc_lookup(query: str, domains: list[str] | None = None) -> dict:
     """Coder agent: look up technical documentation, API references, code examples."""
     return await perplexity_search(
         query=query,
         model="sonar-pro",
         system_prompt="You are a precise technical assistant. Return accurate documentation, code examples, and API references.",
-        search_domain_filter=domains or ["docs.python.org", "developer.mozilla.org", "docs.github.com",
-                                          "stackoverflow.com", "pypi.org", "npmjs.com"],
+        search_domain_filter=domains
+        or [
+            "docs.python.org",
+            "developer.mozilla.org",
+            "docs.github.com",
+            "stackoverflow.com",
+            "pypi.org",
+            "npmjs.com",
+        ],
         search_context_size="high",
         max_tokens=2048,
     )
