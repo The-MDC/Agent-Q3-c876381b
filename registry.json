@@ -1,0 +1,283 @@
+{
+  "name": "Agent Q3",
+  "label": "unified",
+  "version": "3.0",
+  "updated": "2026-05-24",
+  "platform": "MAD Gambit",
+  "owner": "MADdegen",
+
+  "model_stack": {
+    "reasoner": {
+      "tag": "hf.co/unsloth/Qwen2.5-VL-32B-Instruct-GGUF:Q4_K_M",
+      "format": "Unsloth Dynamic 2.0 / Q4_K_M GGUF",
+      "capabilities": ["multimodal", "deep reasoning", "planning"],
+      "route": "/v1/reason"
+    },
+    "support": {
+      "tag": "hf.co/TeichAI/Qwen3-8B-Kimi-K2-Thinking-Distill-GGUF:Q4_K_M",
+      "format": "Unsloth Dynamic 2.0 / Q4_K_M GGUF",
+      "capabilities": ["hybrid", "thinking", "punches at 16B"],
+      "route": "/v1/support"
+    },
+    "coder": {
+      "tag": "hf.co/unsloth/QwQ-32B-GGUF:Q4_K_M",
+      "format": "Unsloth Dynamic 2.0 / Q4_K_M GGUF",
+      "capabilities": ["deep research", "coding"],
+      "context_length": 131072,
+      "route": "/v1/code"
+    }
+  },
+
+  "assets": [
+    {
+      "type": "dataset",
+      "label": "Agent Q3 (unified)",
+      "url": "https://huggingface.co/datasets/madDegen/agent-q3",
+      "hf_id": "madDegen/agent-q3",
+      "license": "apache-2.0",
+      "structure": {
+        "Q3 Evo": {
+          "exports": "Domain JSONL exports (Solidity, prediction markets, LangGraph)",
+          "feedback": "RLHF / DPO feedback signals from Q3 Evo inference runs",
+          "chroma": "ChromaDB vector store snapshots (384-dim nomic embeddings)",
+          "benchmarks": "Q3 Evo evaluation results and accuracy benchmarks",
+          "pipelines": "Q3 Evo pipeline artifacts and run metadata",
+          "corpora": "Domain-filtered training text",
+          "lora_signals": "LoRA feedback pairs (prompt → chosen / rejected)",
+          "arxiv": "arXiv paper embeddings (384-dim)",
+          "lora_runs": "LoRA experiment checkpoints and loss curves",
+          "arxiv_ingestion": "Processed arXiv chunks",
+          "run_logs": "Training run metadata",
+          "metadata": "Dataset cards, version logs, provenance",
+          "eval_sets": "Cross-variant QA evaluation sets"
+        }
+      }
+    },
+    {
+      "type": "model_repo",
+      "label": "Agent Q3 (unified)",
+      "url": "https://huggingface.co/madDegen/agent-q3-core",
+      "hf_id": "madDegen/agent-q3-core"
+    },
+    {
+      "type": "space",
+      "label": "Agent Q3 (unified)",
+      "url": "https://huggingface.co/spaces/madDegen/agent-q3-space",
+      "hf_id": "madDegen/agent-q3-space"
+    }
+  ],
+
+  "github": {
+    "maddegen": [
+      {
+        "repo": "MADdegen/Agent-Q3",
+        "role": "orchestrator",
+        "description": "Agent Q3 — Triple-model orchestration (Qwen2.5-VL-32B + Qwen3-8B-Kimi + QwQ-32B) with Railway/HuggingFace/RunPod compute routing",
+        "visibility": "public",
+        "url": "https://github.com/MADdegen/Agent-Q3",
+        "deploy_target": "railway",
+        "last_pushed": "2026-05-21",
+        "open_issues": 2,
+        "default_branch": "main"
+      },
+      {
+        "repo": "MADdegen/MPP-2.0",
+        "role": "platform",
+        "description": "MAD Gambit — Prediction conviction market platform. React 18 + TypeScript + Supabase + Solidity/Foundry on Arbitrum.",
+        "visibility": "private",
+        "url": "https://github.com/MADdegen/MPP-2.0",
+        "last_pushed": "2026-04-20",
+        "open_issues": 6,
+        "default_branch": "main"
+      },
+      {
+        "repo": "MADdegen/lobehub",
+        "role": "chat-ui",
+        "description": "LobeHub — multi-agent collaboration UI fork on canary branch",
+        "visibility": "private",
+        "url": "https://github.com/MADdegen/lobehub",
+        "last_pushed": "2026-05-15",
+        "open_issues": 3,
+        "default_branch": "canary"
+      },
+      {
+        "repo": "MADdegen/MADHATs-Gambit-Presentation",
+        "role": "investor-presentation",
+        "description": "MΛDHAT's Gambit — Interactive Investor Presentation & Data Room",
+        "visibility": "public",
+        "url": "https://github.com/MADdegen/MADHATs-Gambit-Presentation",
+        "deploy_target": "github-pages",
+        "last_pushed": "2026-05-06",
+        "open_issues": 0,
+        "default_branch": "main"
+      },
+      {
+        "repo": "MADdegen/My-Claude",
+        "role": "claude-toolkit",
+        "description": "Consolidated Claude Code tools, skills, hooks, rules, best practices, agent SDKs, and AI toolkit",
+        "visibility": "private",
+        "url": "https://github.com/MADdegen/My-Claude",
+        "last_pushed": "2026-05-12",
+        "open_issues": 0,
+        "default_branch": "The-MDC"
+      },
+      {
+        "repo": "MADdegen/MAD-Smart-Wallet-Stack",
+        "role": "web3-auth",
+        "description": "Privy + Alchemy AA-SDK — Web2 auth over Web3 smart wallets with gas sponsorship",
+        "visibility": "private",
+        "url": "https://github.com/MADdegen/MAD-Smart-Wallet-Stack",
+        "last_pushed": "2026-03-22",
+        "open_issues": 0
+      },
+      {
+        "repo": "MADdegen/MAD-Card-Art-Generator",
+        "role": "nft-pipeline",
+        "description": "FLUX LoRA pipeline for satirical Pixar-style NFT card art generation",
+        "visibility": "private",
+        "url": "https://github.com/MADdegen/MAD-Card-Art-Generator",
+        "last_pushed": "2026-03-22",
+        "open_issues": 0
+      },
+      {
+        "repo": "MADdegen/MAD-Scandal-Corpus",
+        "role": "knowledge-graph",
+        "description": "GDELT + GossipCop + GraphRAG — Entertainment knowledge graph for prediction markets",
+        "visibility": "private",
+        "url": "https://github.com/MADdegen/MAD-Scandal-Corpus",
+        "last_pushed": "2026-03-22",
+        "open_issues": 0
+      },
+      {
+        "repo": "MADdegen/MAD-AI-Agent-Stack",
+        "role": "agent-framework",
+        "description": "CrewAI + DeepSeek-R1 + Ollama — Grok-class reasoning agents for MAD Gambit",
+        "visibility": "private",
+        "url": "https://github.com/MADdegen/MAD-AI-Agent-Stack",
+        "last_pushed": "2026-03-22",
+        "open_issues": 0
+      },
+      {
+        "repo": "MADdegen/My-AI-and-Agents",
+        "role": "ai-frameworks",
+        "description": "Consolidated AI, ML, LLM, and Agentic frameworks — CrewAI, DeepSeek, GraphRAG, Mem0, Instructor, OpenManus, Agent Squad",
+        "visibility": "private",
+        "url": "https://github.com/MADdegen/My-AI-and-Agents",
+        "last_pushed": "2026-03-23",
+        "open_issues": 0
+      },
+      {
+        "repo": "MADdegen/My-Alchemy",
+        "role": "web3-sdk",
+        "description": "Consolidated Alchemy SDK, Account Kit, Smart Wallets, Gas Manager, and Web3 dApp tools",
+        "visibility": "private",
+        "url": "https://github.com/MADdegen/My-Alchemy",
+        "last_pushed": "2026-03-23",
+        "open_issues": 0
+      },
+      {
+        "repo": "MADdegen/MANIACs",
+        "role": "brand-assets",
+        "description": "MegaManiac and Megalomaniac collection — images, assets, and brand materials",
+        "visibility": "private",
+        "url": "https://github.com/MADdegen/MANIACs",
+        "last_pushed": "2026-03-23",
+        "open_issues": 0
+      },
+      {
+        "repo": "MADdegen/AI-Database",
+        "role": "model-registry",
+        "description": "Comprehensive AI database with OpenRouter models and Hugging Face datasets",
+        "visibility": "private",
+        "url": "https://github.com/MADdegen/AI-Database",
+        "last_pushed": "2026-01-07",
+        "open_issues": 0
+      }
+    ],
+    "the_mdc": [
+      {
+        "repo": "The-MDC/mad-gambit-core",
+        "role": "platform-core",
+        "description": "MAD Gambit — Prediction Conviction Market Core Platform (Contracts + Backend + Frontend)",
+        "visibility": "private",
+        "url": "https://github.com/The-MDC/mad-gambit-core",
+        "last_pushed": "2026-04-20",
+        "open_issues": 0,
+        "default_branch": "The-MDC"
+      },
+      {
+        "repo": "The-MDC/mad-gambit-ui",
+        "role": "platform-ui",
+        "description": "MAD Gambit — React 18 + TypeScript + Tailwind + Shadcn Frontend Dashboard",
+        "visibility": "private",
+        "url": "https://github.com/The-MDC/mad-gambit-ui",
+        "last_pushed": "2026-04-13",
+        "open_issues": 0,
+        "default_branch": "The-MDC"
+      },
+      {
+        "repo": "The-MDC/MADHATs-Gambit-Presentation",
+        "role": "investor-presentation",
+        "description": "MAD Gambit Presentation",
+        "visibility": "public",
+        "url": "https://github.com/The-MDC/MADHATs-Gambit-Presentation",
+        "deploy_target": "github-pages",
+        "last_pushed": "2026-05-04",
+        "open_issues": 0,
+        "default_branch": "The-MDC"
+      },
+      {
+        "repo": "The-MDC/MADHATs-Claude-Enhancement",
+        "role": "claude-enhancement",
+        "description": "Complete Claude + Claude Code enhancement stack — skills, hooks, commands, CLAUDE.md, Cowork setup",
+        "visibility": "private",
+        "url": "https://github.com/The-MDC/MADHATs-Claude-Enhancement",
+        "last_pushed": "2026-03-26",
+        "open_issues": 0,
+        "default_branch": "The-MDC"
+      },
+      {
+        "repo": "The-MDC/huggingface-chat-ui",
+        "role": "chat-ui-fork",
+        "description": "The open source codebase powering HuggingChat (fork)",
+        "visibility": "private",
+        "url": "https://github.com/The-MDC/huggingface-chat-ui",
+        "last_pushed": "2026-04-04",
+        "open_issues": 0,
+        "default_branch": "main"
+      }
+    ]
+  },
+
+  "deployment": {
+    "primary": {
+      "platform": "Railway",
+      "project": "exciting-freedom",
+      "api_port": 8000,
+      "auto_deploy_branch": "main"
+    },
+    "compute_cascade": [
+      "Railway (Ollama GPU volume)",
+      "HuggingFace Router",
+      "RunPod (serverless GPU)",
+      "OpenRouter (fallback)"
+    ],
+    "memory": {
+      "short_term": "Redis (24h TTL)",
+      "long_term": "Postgres pgvector (384-dim)"
+    },
+    "search": ["DuckDuckGo", "Jina", "ArXiv", "SearXNG", "Exa", "Tavily", "Perplexity"],
+    "cowork": {
+      "mcp_endpoint": "/cowork/mcp",
+      "memory_endpoint": "/cowork/memory/",
+      "tools_exposed": 8
+    }
+  },
+
+  "canonical_numbers": {
+    "platform_fee": "1.88%",
+    "community_profit_share": "28.8%",
+    "creator_revenue_share": "40%",
+    "seed_raise": "$1-2M at $12M pre-money valuation"
+  }
+}
