@@ -93,9 +93,9 @@ jobs:
           pytest tests/unit/ -v --cov=orchestrator --cov-report=xml \
             --cov-report=term-missing -x
         env:
-          REASONER_MODEL: "gemma4:e4b-instruct-q4_K_M"
-          CODER_MODEL: "qwen3.5:4b-instruct-q4_K_M"
-          COMPUTE_STRATEGY: "local_first"
+          REASONER_MODEL: "kimi-vl:a3b-cloud"
+          CODER_MODEL: "qwen3:48b-a4b-cloud"
+          COMPUTE_STRATEGY: "cloud_priority"
           OLLAMA_BASE_URL: "http://localhost:11434"
 
       # ── Integration tests (Ollama container via Testcontainers Cloud) ──────
@@ -105,8 +105,8 @@ jobs:
           pytest tests/integration/ -v --timeout=120 -x
         env:
           TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
-          REASONER_MODEL: "gemma4:e4b-instruct-q4_K_M"
-          CODER_MODEL: "qwen3.5:4b-instruct-q4_K_M"
+          REASONER_MODEL: "kimi-vl:a3b-cloud"
+          CODER_MODEL: "qwen3:48b-a4b-cloud"
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
         continue-on-error: true   # integration tests are informational until RunPod is wired
@@ -168,8 +168,8 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
           build-args: |
-            REASONER_MODEL=gemma4:e4b-instruct-q4_K_M
-            CODER_MODEL=qwen3.5:4b-instruct-q4_K_M
+            REASONER_MODEL=kimi-vl:a3b-cloud
+            CODER_MODEL=qwen3:48b-a4b-cloud
 
       - name: Image digest
         run: |
@@ -178,7 +178,7 @@ jobs:
 
 # ─────────────────────────────────────────────────────────────────────────────
   deploy-railway:
-    name: Deploy → Railway (ollama-gemma4-qwen35-pair)
+    name: Deploy → Railway (agent-q3-orchestrator)
     runs-on: ubuntu-latest
     needs: build-push
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
@@ -224,9 +224,10 @@ jobs:
         run: |
           echo "═══════════════════════════════════════════════════════"
           echo "  Agent-Q3 deployed to Railway"
-          echo "  Orchestrator: https://ollama-gemma4-qwen35-pair-staging.up.railway.app"
-          echo "  Reasoner    : gemma4:e4b-instruct-q4_K_M  (Gemma4-E4B)"
-          echo "  Coder       : qwen3.5:4b-instruct-q4_K_M  (Qwen3.5-4B)"
-          echo "  Strategy    : ${{ github.event.inputs.compute_strategy || 'round_robin' }}"
+          echo "  Orchestrator: https://agent-q3-staging.up.railway.app"
+          echo "  Reasoner    : kimi-vl:a3b-cloud"
+          echo "  Support     : hermes3:8b-cloud"
+          echo "  Coder       : qwen3:48b-a4b-cloud"
+          echo "  Strategy    : ${{ github.event.inputs.compute_strategy || 'cloud_priority' }}"
           echo "  Digest      : ${{ needs.build-push.outputs.image_digest }}"
           echo "═══════════════════════════════════════════════════════"

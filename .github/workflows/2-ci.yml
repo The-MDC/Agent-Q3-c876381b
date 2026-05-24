@@ -22,9 +22,9 @@ env:
   DATABASE_URL: "postgresql://stub:stub@localhost:5432/stub"
   REDIS_URL: "redis://stub:6379"
   PORT: "8000"
-  REASONER_MODEL: "gemma4:e4b-instruct-q4_K_M"
-  CODER_MODEL: "qwen3.5:4b-instruct-q4_K_M"
-  COMPUTE_STRATEGY: "local_first"
+  REASONER_MODEL: "kimi-vl:a3b-cloud"
+  CODER_MODEL: "qwen3:48b-a4b-cloud"
+  COMPUTE_STRATEGY: "cloud_priority"
 
 jobs:
 # ─────────────────────────────────────────────────────────────────────────────
