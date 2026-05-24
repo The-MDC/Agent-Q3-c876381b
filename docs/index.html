@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MΛĐ Gambit — Presentations</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: #05070c;
+      color: #e8eefc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .logo-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(124,255,199,0.12), rgba(232,130,255,0.12));
+      border: 1px solid rgba(124,255,199,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(124,255,199,0.2);
+    }
+
+    h1 {
+      font-size: clamp(1.4rem, 4vw, 2rem);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #fff 0%, #8bfdcf 50%, #c98aff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 0.7rem;
+      font-family: monospace;
+      color: #64748b;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-top: 0.25rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.25rem;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .card {
+      position: relative;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 1.75rem 1.5rem;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top left, rgba(124,255,199,0.06), transparent 60%);
+      opacity: 0;
+      transition: opacity 0.3s;
+      border-radius: 16px;
+    }
+
+    .card:hover {
+      border-color: rgba(124,255,199,0.35);
+      box-shadow: 0 0 28px rgba(124,255,199,0.12);
+      transform: translateY(-2px);
+    }
+
+    .card:hover::before { opacity: 1; }
+
+    .card-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.6rem;
+      font-family: monospace;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #34d399;
+      background: rgba(52,211,153,0.1);
+      border: 1px solid rgba(52,211,153,0.2);
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+
+    .card-badge .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #34d399;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 0.5rem;
+      color: #f0f4ff;
+    }
+
+    .card p {
+      font-size: 0.78rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    .card-arrow {
+      position: absolute;
+      bottom: 1.25rem;
+      right: 1.25rem;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(124,255,199,0.08);
+      border: 1px solid rgba(124,255,199,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #7cffc7;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+
+    .card:hover .card-arrow {
+      background: rgba(124,255,199,0.18);
+    }
+
+    footer {
+      margin-top: 3rem;
+      font-size: 0.65rem;
+      font-family: monospace;
+      color: #1e293b;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="logo-wrap">
+    <div class="logo-icon">
+      <svg viewBox="0 0 100 100" width="34" height="34">
+        <ellipse cx="50" cy="76" rx="42" ry="12" fill="#090518" stroke="#f43f5e" stroke-width="2.5"/>
+        <ellipse cx="50" cy="78" rx="30" ry="6" fill="#04020a" stroke="#ec4899" stroke-width="1"/>
+        <path d="M 22 72 L 78 72 L 70 24 L 30 24 Z" fill="#05030e" stroke="#f43f5e" stroke-width="3"/>
+        <ellipse cx="50" cy="24" rx="20" ry="5" fill="#06030c" stroke="#f43f5e" stroke-width="2.5"/>
+        <path d="M 21.8 62 Q 50 67 78.2 62 L 76.8 70 Q 50 75 23.2 70 Z" fill="#ec4899" stroke="#fda4af" stroke-width="0.5"/>
+        <g transform="translate(42,33) scale(0.16)">
+          <path d="M 35 10 C 25 10, 15 20, 15 35 Q 15 45, 20 50 L 15 75 Q 25 80, 50 80 Q 75 80, 85 75 L 80 50 Q 85 45, 85 35 C 85 20, 75 10, 65 10 Z" fill="#ffd700"/>
+        </g>
+      </svg>
+    </div>
+    <div>
+      <h1>MΛĐ Gambit</h1>
+      <p class="subtitle">Outlier co-development node</p>
+    </div>
+  </div>
+
+  <div class="grid">
+    <a href="pitch-deck.html" class="card">
+      <div class="card-badge"><span class="dot"></span>Live</div>
+      <h2>Pitch Deck — May 2026</h2>
+      <p>Data Room · Conviction Markets · Card Economy · Founder's Golden Ticket</p>
+      <div class="card-arrow">→</div>
+    </a>
+  </div>
+
+  <footer>© 2026 MAD Gambit · MAD GAMBIT</footer>
+
+</body>
+</html>
