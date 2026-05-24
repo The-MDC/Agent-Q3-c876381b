@@ -1,8 +1,10 @@
 import httpx
 import structlog
+
 from orchestrator.config import settings
 
 logger = structlog.get_logger(__name__)
+
 
 async def call_huggingface(model: str, prompt: str, max_tokens: int = 512) -> str:
     """Call HuggingFace Inference API directly"""
@@ -17,8 +19,8 @@ async def call_huggingface(model: str, prompt: str, max_tokens: int = 512) -> st
                         "max_new_tokens": max_tokens,
                         "temperature": 0.7,
                         "top_p": 0.95,
-                    }
-                }
+                    },
+                },
             )
             if r.status_code == 200:
                 result = r.json()

@@ -86,12 +86,14 @@ async def tools():
     flat = []
     for srv, tlist in by_server.items():
         for t in tlist:
-            flat.append({
-                "server": srv,
-                "name": t.get("name"),
-                "description": t.get("description", ""),
-                "schema": t.get("inputSchema", {}),
-            })
+            flat.append(
+                {
+                    "server": srv,
+                    "name": t.get("name"),
+                    "description": t.get("description", ""),
+                    "schema": t.get("inputSchema", {}),
+                }
+            )
     return {"count": len(flat), "tools": flat, "by_server": by_server}
 
 
@@ -99,7 +101,9 @@ async def tools():
 async def call(req: CallRequest):
     cache_key = None
     if req.cache_ttl_secs > 0:
-        import hashlib, json as _json
+        import hashlib
+        import json as _json
+
         h = hashlib.sha256(
             _json.dumps({"s": req.server, "t": req.tool, "a": req.args}, sort_keys=True).encode()
         ).hexdigest()[:16]

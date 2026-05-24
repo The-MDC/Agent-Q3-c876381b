@@ -6,20 +6,18 @@ Traces:
 - Multi-agent spawning
 - Reasoning steps
 """
+
 from __future__ import annotations
 
-from typing import Optional
 import structlog
-from opentelemetry import trace, metrics
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry import trace
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
-from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-
-from ..config import settings
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 logger = structlog.get_logger(__name__)
 
@@ -41,9 +39,7 @@ class AgentTracer:
             )
 
             # Tracer provider
-            trace_provider = TracerProvider(
-                resource=Resource.create({SERVICE_NAME: self.service_name})
-            )
+            trace_provider = TracerProvider(resource=Resource.create({SERVICE_NAME: self.service_name}))
             trace_provider.add_span_processor(BatchSpanProcessor(jaeger_exporter))
             trace.set_tracer_provider(trace_provider)
 
@@ -119,7 +115,7 @@ class AgentTracer:
 
 
 # Singleton
-_agent_tracer: Optional[AgentTracer] = None
+_agent_tracer: AgentTracer | None = None
 
 
 def get_agent_tracer() -> AgentTracer:

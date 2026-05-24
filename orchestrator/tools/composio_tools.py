@@ -7,11 +7,9 @@ Provides tools for:
 - Browser (web access, screenshots)
 - Claude Deep Search (research)
 """
+
 from __future__ import annotations
 
-import json
-from typing import Optional
-import httpx
 import structlog
 from composio import Composio
 from composio.client.collections import DEFAULT_ENTITY_ID
@@ -138,7 +136,7 @@ class ComposioToolsClient:
             }
 
 
-_composio_client: Optional[ComposioToolsClient] = None
+_composio_client: ComposioToolsClient | None = None
 
 
 def get_composio_client() -> ComposioToolsClient:

@@ -1,4 +1,3 @@
-from __future__ import annotations
 """
 memory_store.py — Persistent vector memory for Agent-Q3.
 
@@ -13,10 +12,13 @@ Usage:
   await mem.save(text="Nick prefers Q4_K_M quants", tags=["preference","models"])
   results = await mem.search("model preferences", k=5)
 """
+
+from __future__ import annotations
+
 import hashlib
 import json
 import time
-from typing import Optional
+
 import httpx
 
 from orchestrator.config import settings
@@ -34,10 +36,7 @@ class MemoryStore:
     async def _embed(self, text: str) -> list[float]:
         """Generate 384-dim embedding via Ollama nomic-embed-text."""
         async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.post(
-                f"{self.ollama_url}/api/embeddings",
-                json={"model": self.embed_model, "prompt": text}
-            )
+            r = await client.post(f"{self.ollama_url}/api/embeddings", json={"model": self.embed_model, "prompt": text})
             return r.json()["embedding"]
 
     async def save(
@@ -88,6 +87,7 @@ class MemoryStore:
             return
         try:
             import asyncpg
+
             conn = await asyncpg.connect(self.db_url)
             await conn.execute(
                 """INSERT INTO agent_memory
@@ -103,7 +103,7 @@ class MemoryStore:
                 json.dumps(record["embedding"]),
             )
             await conn.close()
-        except Exception as e:
+        except Exception:
             pass  # Degrade gracefully if DB unavailable
 
     async def _search_postgres(
@@ -113,6 +113,7 @@ class MemoryStore:
             return []
         try:
             import asyncpg
+
             conn = await asyncpg.connect(self.db_url)
             vec_str = "[" + ",".join(str(x) for x in embedding) + "]"
             rows = await conn.fetch(
@@ -122,7 +123,9 @@ class MemoryStore:
                    WHERE 1 - (embedding <=> $1::vector) >= $2
                    ORDER BY embedding <=> $1::vector
                    LIMIT $3""",
-                vec_str, min_score, k
+                vec_str,
+                min_score,
+                k,
             )
             await conn.close()
             return [dict(r) for r in rows]
@@ -134,10 +137,11 @@ class MemoryStore:
             return []
         try:
             import asyncpg
+
             conn = await asyncpg.connect(self.db_url)
             rows = await conn.fetch(
                 "SELECT id, text, tags, source, timestamp FROM agent_memory WHERE $1=ANY(tags) ORDER BY timestamp DESC LIMIT 50",
-                tag
+                tag,
             )
             await conn.close()
             return [dict(r) for r in rows]
@@ -150,10 +154,9 @@ class MemoryStore:
             return
         try:
             import redis.asyncio as aioredis
+
             r = aioredis.from_url(self.redis_url)
-            await r.setex(f"mem:{mem_id}", 86400, json.dumps({
-                k: v for k, v in record.items() if k != "embedding"
-            }))
+            await r.setex(f"mem:{mem_id}", 86400, json.dumps({k: v for k, v in record.items() if k != "embedding"}))
             await r.lpush("mem:recent", mem_id)
             await r.ltrim("mem:recent", 0, 99)
             await r.aclose()
@@ -165,6 +168,7 @@ class MemoryStore:
             return []
         try:
             import redis.asyncio as aioredis
+
             r = aioredis.from_url(self.redis_url)
             ids = await r.lrange("mem:recent", 0, n - 1)
             results = []
@@ -198,4 +202,4 @@ CREATE INDEX IF NOT EXISTS agent_memory_embedding_idx
 
 CREATE INDEX IF NOT EXISTS agent_memory_tags_idx
     ON agent_memory USING GIN (tags);
-""";
+"""

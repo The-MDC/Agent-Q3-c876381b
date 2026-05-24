@@ -26,20 +26,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from .config import settings
-from .router import router, Backend
 from .memory import memory
-from .skills import skills
-from .plugins import plugins
 from .models import (
+    CODER_SYSTEM,
+    HERMES_SYSTEM,
+    REASONER_SYSTEM,
     ChatRequest,
     ChatResponse,
     HealthResponse,
-    Message,
     classify_task,
-    REASONER_SYSTEM,
-    CODER_SYSTEM,
-    HERMES_SYSTEM,
 )
+from .plugins import plugins
+from .router import Backend, router
+from .skills import skills
 
 log = structlog.get_logger(__name__)
 
@@ -86,6 +85,7 @@ Instrumentator().instrument(app).expose(app)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _build_messages(
     request: ChatRequest,
     system_override: str | None = None,
@@ -107,6 +107,7 @@ def _extract_content(result: dict) -> str:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+
 @app.get("/", include_in_schema=False)
 async def root():
     return {
@@ -114,16 +115,16 @@ async def root():
         "version": "2.0.0",
         "docs": "/docs",
         "models": {
-            "instruct":   settings.reasoner_model,
-            "tandem":     settings.tandem_model,
+            "instruct": settings.reasoner_model,
+            "tandem": settings.tandem_model,
             "multimodal": settings.coder_model,
-            "fallback":   settings.fallback_model,
+            "fallback": settings.fallback_model,
         },
         "loaded": {
             "memory_backend": memory.backend,
             "skills": [s.to_dict() for s in skills.all],
             "plugins": [p.to_dict() for p in plugins.all],
-        }
+        },
     }
 
 
@@ -131,6 +132,7 @@ async def root():
 async def loaded():
     """Full inventory of models, skills, plugins, memory, and configured MCP servers."""
     import httpx as _httpx
+
     mcp_info: dict = {"reachable": False}
     try:
         async with _httpx.AsyncClient(timeout=3) as client:
@@ -142,17 +144,17 @@ async def loaded():
 
     return {
         "models": {
-            "instruct":        settings.reasoner_model,
-            "tandem":          settings.tandem_model,
-            "multimodal":      settings.coder_model,
-            "fallback":        settings.fallback_model,
+            "instruct": settings.reasoner_model,
+            "tandem": settings.tandem_model,
+            "multimodal": settings.coder_model,
+            "fallback": settings.fallback_model,
             "coder_dedicated": settings.coder_dedicated_model,
-            "monitor_cloud":   settings.kimi_k2_model,
+            "monitor_cloud": settings.kimi_k2_model,
         },
-        "memory":  {"backend": memory.backend, "alive": await memory.ping()},
-        "skills":  [s.to_dict() for s in skills.all],
+        "memory": {"backend": memory.backend, "alive": await memory.ping()},
+        "skills": [s.to_dict() for s in skills.all],
         "plugins": [p.to_dict() for p in plugins.all],
-        "mcp":     mcp_info,
+        "mcp": mcp_info,
     }
 
 
@@ -160,6 +162,7 @@ async def loaded():
 async def health():
     """Full health check — all backends + loaded Ollama models."""
     import httpx as _httpx
+
     ollama_ok = False
     loaded_models = []
     try:
@@ -177,9 +180,9 @@ async def health():
         models_loaded=loaded_models,
         compute_strategy=settings.compute_strategy,
         backends={
-            "local":       router._health[Backend.LOCAL].healthy,
+            "local": router._health[Backend.LOCAL].healthy,
             "huggingface": router._health[Backend.HF].healthy,
-            "runpod":      router._health[Backend.RUNPOD].healthy,
+            "runpod": router._health[Backend.RUNPOD].healthy,
         },
     )
 
@@ -332,7 +335,10 @@ async def tandem(request: ChatRequest):
         {"role": "system", "content": HERMES_SYSTEM},
         *[m.model_dump() for m in request.messages],
         {"role": "assistant", "content": f"[Kimi-VL Analysis]\n{kimi_analysis}"},
-        {"role": "user", "content": "Reason through this carefully. Identify any gaps or improvements in the analysis above, then produce a precise, refined implementation plan."},
+        {
+            "role": "user",
+            "content": "Reason through this carefully. Identify any gaps or improvements in the analysis above, then produce a precise, refined implementation plan.",
+        },
     ]
     try:
         hermes_result = await router.route(
@@ -350,7 +356,10 @@ async def tandem(request: ChatRequest):
     qwen_msgs = [
         {"role": "system", "content": CODER_SYSTEM},
         *[m.model_dump() for m in request.messages],
-        {"role": "assistant", "content": f"[Kimi-VL Analysis]\n{kimi_analysis}\n\n[Hermes3 Refined Plan]\n{hermes_plan}"},
+        {
+            "role": "assistant",
+            "content": f"[Kimi-VL Analysis]\n{kimi_analysis}\n\n[Hermes3 Refined Plan]\n{hermes_plan}",
+        },
         {"role": "user", "content": "Implement this precisely. Return working, production-ready output only."},
     ]
     try:
@@ -366,13 +375,13 @@ async def tandem(request: ChatRequest):
         raise HTTPException(status_code=503, detail=f"Qwen3-48B (Stage 3) failed: {e}")
 
     return {
-        "kimi_analysis":     kimi_analysis,
-        "hermes_plan":       hermes_plan,
-        "implementation":    implementation,
-        "kimi_model":        kimi_result.get("_model_used"),
-        "hermes_model":      hermes_result.get("_model_used"),
-        "qwen_model":        qwen_result.get("_model_used"),
-        "kimi_backend":      kimi_result.get("_backend_used"),
-        "hermes_backend":    hermes_result.get("_backend_used"),
-        "qwen_backend":      qwen_result.get("_backend_used"),
+        "kimi_analysis": kimi_analysis,
+        "hermes_plan": hermes_plan,
+        "implementation": implementation,
+        "kimi_model": kimi_result.get("_model_used"),
+        "hermes_model": hermes_result.get("_model_used"),
+        "qwen_model": qwen_result.get("_model_used"),
+        "kimi_backend": kimi_result.get("_backend_used"),
+        "hermes_backend": hermes_result.get("_backend_used"),
+        "qwen_backend": qwen_result.get("_backend_used"),
     }

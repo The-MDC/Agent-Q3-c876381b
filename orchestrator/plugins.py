@@ -12,11 +12,11 @@ recommended; if present its keys are exposed at /plugins/list.
 
 import importlib.util
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
 import structlog
-from fastapi import FastAPI, APIRouter
+from fastapi import APIRouter, FastAPI
 
 log = structlog.get_logger(__name__)
 
@@ -26,9 +26,9 @@ PLUGINS_DIR = Path("/app/plugins")
 class Plugin:
     __slots__ = ("name", "manifest", "module", "router", "register_fn", "path")
 
-    def __init__(self, name: str, manifest: dict, module,
-                 router: APIRouter | None, register_fn: Callable | None,
-                 path: str):
+    def __init__(
+        self, name: str, manifest: dict, module, router: APIRouter | None, register_fn: Callable | None, path: str
+    ):
         self.name = name
         self.manifest = manifest
         self.module = module
@@ -70,12 +70,11 @@ class PluginRegistry:
             except Exception as e:
                 log.warning("plugin load failed", name=child.name, error=str(e))
 
-        log.info("plugins discovered", count=len(self._plugins),
-                 names=[p.name for p in self._plugins])
+        log.info("plugins discovered", count=len(self._plugins), names=[p.name for p in self._plugins])
         return len(self._plugins)
 
     @staticmethod
-    def _load(plugin_dir: Path, plugin_py: Path) -> Optional[Plugin]:
+    def _load(plugin_dir: Path, plugin_py: Path) -> Plugin | None:
         manifest = {}
         mf = plugin_dir / "manifest.json"
         if mf.exists():
@@ -85,9 +84,7 @@ class PluginRegistry:
                 pass
 
         name = manifest.get("name", plugin_dir.name)
-        spec = importlib.util.spec_from_file_location(
-            f"agent_q3_plugin_{name}", str(plugin_py)
-        )
+        spec = importlib.util.spec_from_file_location(f"agent_q3_plugin_{name}", str(plugin_py))
         if not spec or not spec.loader:
             return None
         module = importlib.util.module_from_spec(spec)
@@ -106,8 +103,7 @@ class PluginRegistry:
         for p in self._plugins:
             try:
                 if p.router is not None:
-                    app.include_router(p.router, prefix=f"/plugins/{p.name}",
-                                       tags=[f"plugin:{p.name}"])
+                    app.include_router(p.router, prefix=f"/plugins/{p.name}", tags=[f"plugin:{p.name}"])
                     mounted += 1
                 if callable(p.register_fn):
                     p.register_fn(app)

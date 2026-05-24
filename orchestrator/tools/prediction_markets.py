@@ -3,21 +3,21 @@ prediction_markets.py — Polymarket + MAD Gambit market intelligence.
 Ported and adapted from MADdegen/agents/polymarket/{polymarket.py,gamma.py}.
 Used by Reasoner agent for market analysis, sentiment, and conviction scoring.
 """
+
 import httpx
-from typing import Optional
 
-
-GAMMA_URL  = "https://gamma-api.polymarket.com"
-CLOB_URL   = "https://clob.polymarket.com"
+GAMMA_URL = "https://gamma-api.polymarket.com"
+CLOB_URL = "https://clob.polymarket.com"
 
 
 # ── Market data fetchers ──────────────────────────────────────────────────────
 
+
 async def get_polymarket_markets(
     limit: int = 20,
     active: bool = True,
-    query: Optional[str] = None,
-    tag: Optional[str] = None,
+    query: str | None = None,
+    tag: str | None = None,
 ) -> list[dict]:
     """
     Fetch active Polymarket markets via Gamma API.
@@ -43,7 +43,7 @@ async def get_polymarket_markets(
 async def get_polymarket_events(
     limit: int = 10,
     active: bool = True,
-    tag: Optional[str] = None,
+    tag: str | None = None,
 ) -> list[dict]:
     """Fetch market events with tag filtering."""
     params: dict = {"limit": limit}
@@ -73,36 +73,48 @@ def _parse_market(m: dict) -> dict:
     outcomes = []
     try:
         import json as _json
-        prices = _json.loads(m.get("outcomePrices", "[]")) if isinstance(m.get("outcomePrices"), str) else m.get("outcomePrices", [])
-        token_ids = _json.loads(m.get("clobTokenIds", "[]")) if isinstance(m.get("clobTokenIds"), str) else m.get("clobTokenIds", [])
+
+        prices = (
+            _json.loads(m.get("outcomePrices", "[]"))
+            if isinstance(m.get("outcomePrices"), str)
+            else m.get("outcomePrices", [])
+        )
+        token_ids = (
+            _json.loads(m.get("clobTokenIds", "[]"))
+            if isinstance(m.get("clobTokenIds"), str)
+            else m.get("clobTokenIds", [])
+        )
         outcome_names = m.get("outcomes", "[]")
         if isinstance(outcome_names, str):
             outcome_names = _json.loads(outcome_names)
         for i, name in enumerate(outcome_names):
-            outcomes.append({
-                "name":     name,
-                "price":    float(prices[i]) if i < len(prices) else None,
-                "token_id": token_ids[i] if i < len(token_ids) else None,
-            })
+            outcomes.append(
+                {
+                    "name": name,
+                    "price": float(prices[i]) if i < len(prices) else None,
+                    "token_id": token_ids[i] if i < len(token_ids) else None,
+                }
+            )
     except Exception:
         pass
 
     return {
-        "id":           m.get("id"),
-        "question":     m.get("question"),
-        "description":  m.get("description","")[:200],
-        "end_date":     m.get("endDate"),
-        "volume":       m.get("volume"),
-        "liquidity":    m.get("liquidity"),
-        "active":       m.get("active"),
-        "outcomes":     outcomes,
-        "tags":         [t.get("label","") for t in m.get("tags", [])],
+        "id": m.get("id"),
+        "question": m.get("question"),
+        "description": m.get("description", "")[:200],
+        "end_date": m.get("endDate"),
+        "volume": m.get("volume"),
+        "liquidity": m.get("liquidity"),
+        "active": m.get("active"),
+        "outcomes": outcomes,
+        "tags": [t.get("label", "") for t in m.get("tags", [])],
         "clob_rewards": m.get("clobRewards"),
-        "source":       "polymarket",
+        "source": "polymarket",
     }
 
 
 # ── Conviction analysis (Reasoner agent) ─────────────────────────────────────
+
 
 async def analyze_market_conviction(market_id: str) -> dict:
     """
@@ -123,20 +135,22 @@ async def analyze_market_conviction(market_id: str) -> dict:
             implied_prob = float(price)
             # Conviction score: distance from 0.5 (the more decisive, the higher)
             conviction = abs(implied_prob - 0.5) * 2  # 0=coin-flip, 1=certain
-            conviction_scores.append({
-                "outcome":      outcome["name"],
-                "implied_prob": round(implied_prob, 4),
-                "conviction":   round(conviction, 4),
-                "token_id":     outcome.get("token_id"),
-            })
+            conviction_scores.append(
+                {
+                    "outcome": outcome["name"],
+                    "implied_prob": round(implied_prob, 4),
+                    "conviction": round(conviction, 4),
+                    "token_id": outcome.get("token_id"),
+                }
+            )
 
     return {
-        "market_id":    market_id,
-        "question":     target.get("question"),
-        "volume":       target.get("volume"),
-        "liquidity":    target.get("liquidity"),
-        "convictions":  conviction_scores,
-        "platform":     "polymarket",
+        "market_id": market_id,
+        "question": target.get("question"),
+        "volume": target.get("volume"),
+        "liquidity": target.get("liquidity"),
+        "convictions": conviction_scores,
+        "platform": "polymarket",
         "mad_gambit_fee": "1.88%",  # canonical platform fee
     }
 

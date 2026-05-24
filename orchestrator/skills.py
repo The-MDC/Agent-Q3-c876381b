@@ -22,7 +22,6 @@ skill objects through `skills.find_for(query, role)`.
 
 import re
 from pathlib import Path
-from typing import Optional
 
 import structlog
 
@@ -34,8 +33,7 @@ SKILLS_DIR = Path("/app/skills")
 class Skill:
     __slots__ = ("name", "description", "triggers", "roles", "body", "path")
 
-    def __init__(self, name: str, description: str, triggers: list[str],
-                 roles: list[str], body: str, path: str):
+    def __init__(self, name: str, description: str, triggers: list[str], roles: list[str], body: str, path: str):
         self.name = name
         self.description = description
         self.triggers = [t.lower() for t in triggers]
@@ -78,12 +76,11 @@ class SkillRegistry:
             except Exception as e:
                 log.warning("skill parse failed", path=str(path), error=str(e))
 
-        log.info("skills loaded", count=len(self._skills),
-                 names=[s.name for s in self._skills])
+        log.info("skills loaded", count=len(self._skills), names=[s.name for s in self._skills])
         return len(self._skills)
 
     @staticmethod
-    def _parse(path: Path) -> Optional[Skill]:
+    def _parse(path: Path) -> Skill | None:
         text = path.read_text(encoding="utf-8")
         # frontmatter delimited by leading and trailing ---
         m = re.match(r"^---\n(.*?)\n---\n(.*)$", text, re.DOTALL)
@@ -119,7 +116,7 @@ class SkillRegistry:
     def find_for(self, query: str, role: str | None = None) -> list[Skill]:
         return [s for s in self._skills if s.matches(query, role)]
 
-    def get(self, name: str) -> Optional[Skill]:
+    def get(self, name: str) -> Skill | None:
         for s in self._skills:
             if s.name == name:
                 return s

@@ -1,8 +1,8 @@
 import httpx
 import structlog
-from orchestrator.config import settings
 
 logger = structlog.get_logger(__name__)
+
 
 async def call_runpod_community(model: str, prompt: str, endpoint: str) -> str:
     """Call RunPod Community Cloud Ollama endpoint"""
@@ -15,7 +15,7 @@ async def call_runpod_community(model: str, prompt: str, endpoint: str) -> str:
                     "prompt": prompt,
                     "stream": False,
                     "temperature": 0.7,
-                }
+                },
             )
             if r.status_code == 200:
                 result = r.json()
@@ -26,6 +26,7 @@ async def call_runpod_community(model: str, prompt: str, endpoint: str) -> str:
         except Exception as e:
             logger.error("runpod community call failed", error=str(e))
             raise
+
 
 async def call_runpod_serverless(model: str, prompt: str, endpoint: str) -> str:
     """Call RunPod Serverless endpoint"""
@@ -39,7 +40,7 @@ async def call_runpod_serverless(model: str, prompt: str, endpoint: str) -> str:
                         "prompt": prompt,
                         "temperature": 0.7,
                     }
-                }
+                },
             )
             if r.status_code == 200:
                 result = r.json()

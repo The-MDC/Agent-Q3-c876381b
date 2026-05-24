@@ -7,8 +7,8 @@ Priority chain: Local Ollama → OpenRouter → HuggingFace → RunPod
 """
 
 import time
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
+
 import httpx
 import structlog
 
@@ -17,10 +17,10 @@ from .config import settings
 log = structlog.get_logger(__name__)
 
 
-class Backend(str, Enum):
-    LOCAL      = "local"
-    HF         = "huggingface"
-    RUNPOD     = "runpod"
+class Backend(StrEnum):
+    LOCAL = "local"
+    HF = "huggingface"
+    RUNPOD = "runpod"
     OPENROUTER = "openrouter"
 
 
@@ -52,26 +52,26 @@ class BackendHealth:
 #   fallback        Qwopus3.6-27B               — fallback multimodal
 #   coder_dedicated Qwen3-Coder-30B-A3B         — dedicated coder service
 LOCAL_MODEL_MAP = {
-    "reasoner":        lambda: settings.reasoner_model,
-    "tandem":          lambda: settings.tandem_model,
-    "coder":           lambda: settings.coder_model,
-    "fallback":        lambda: settings.fallback_model,
+    "reasoner": lambda: settings.reasoner_model,
+    "tandem": lambda: settings.tandem_model,
+    "coder": lambda: settings.coder_model,
+    "fallback": lambda: settings.fallback_model,
     "coder_dedicated": lambda: settings.coder_dedicated_model,
 }
 
 HF_MODEL_MAP = {
-    "reasoner":        lambda: settings.hf_reasoner_model,
-    "tandem":          lambda: settings.hf_tandem_model,
-    "coder":           lambda: settings.hf_coder_model,
-    "fallback":        lambda: settings.hf_coder_model,
+    "reasoner": lambda: settings.hf_reasoner_model,
+    "tandem": lambda: settings.hf_tandem_model,
+    "coder": lambda: settings.hf_coder_model,
+    "fallback": lambda: settings.hf_coder_model,
     "coder_dedicated": lambda: settings.hf_frontier_coder,
 }
 
 OPENROUTER_MODEL_MAP = {
-    "reasoner":        lambda: settings.openrouter_reasoner_model,
-    "tandem":          lambda: settings.openrouter_tandem_model,
-    "coder":           lambda: settings.openrouter_coder_model,
-    "fallback":        lambda: settings.openrouter_fallback_model,
+    "reasoner": lambda: settings.openrouter_reasoner_model,
+    "tandem": lambda: settings.openrouter_tandem_model,
+    "coder": lambda: settings.openrouter_coder_model,
+    "fallback": lambda: settings.openrouter_fallback_model,
     "coder_dedicated": lambda: settings.openrouter_coder_model,
 }
 
@@ -89,16 +89,16 @@ class ComputeRouter:
 
     def __init__(self):
         self._health: dict[Backend, BackendHealth] = {
-            Backend.LOCAL:      BackendHealth(),
-            Backend.HF:         BackendHealth(),
-            Backend.RUNPOD:     BackendHealth(),
+            Backend.LOCAL: BackendHealth(),
+            Backend.HF: BackendHealth(),
+            Backend.RUNPOD: BackendHealth(),
             Backend.OPENROUTER: BackendHealth(),
         }
         self._rr_counter: int = 0
         self._weights = {
-            Backend.LOCAL:      settings.local_weight,
-            Backend.HF:         settings.hf_weight,
-            Backend.RUNPOD:     settings.runpod_weight,
+            Backend.LOCAL: settings.local_weight,
+            Backend.HF: settings.hf_weight,
+            Backend.RUNPOD: settings.runpod_weight,
             Backend.OPENROUTER: settings.openrouter_weight,
         }
         self._weighted_order: list[Backend] = self._build_weighted_order()
@@ -140,21 +140,12 @@ class ComputeRouter:
 
     # ── Backend implementations ───────────────────────────────────────────────
 
-    async def call_local(
-        self,
-        model: str,
-        messages: list[dict],
-        stream: bool = False,
-        **kwargs
-    ) -> dict:
+    async def call_local(self, model: str, messages: list[dict], stream: bool = False, **kwargs) -> dict:
         payload = {"model": model, "messages": messages, "stream": stream, **kwargs}
         h = self._health[Backend.LOCAL]
         try:
             async with httpx.AsyncClient(timeout=settings.request_timeout_secs) as client:
-                r = await client.post(
-                    f"{settings.ollama_base_url}/api/chat",
-                    json=payload
-                )
+                r = await client.post(f"{settings.ollama_base_url}/api/chat", json=payload)
                 r.raise_for_status()
                 h.mark_success()
                 return r.json()
@@ -163,12 +154,7 @@ class ComputeRouter:
             log.error("local backend error", model=model, error=str(e))
             raise
 
-    async def call_hf(
-        self,
-        model_id: str,
-        messages: list[dict],
-        **kwargs
-    ) -> dict:
+    async def call_hf(self, model_id: str, messages: list[dict], **kwargs) -> dict:
         """HuggingFace Router — OpenAI-compatible chat completions."""
         token = settings.active_hf_token()
         if not token:
@@ -186,11 +172,7 @@ class ComputeRouter:
         }
         try:
             async with httpx.AsyncClient(timeout=settings.request_timeout_secs) as client:
-                r = await client.post(
-                    f"{settings.hf_router_url}/chat/completions",
-                    headers=headers,
-                    json=payload
-                )
+                r = await client.post(f"{settings.hf_router_url}/chat/completions", headers=headers, json=payload)
                 r.raise_for_status()
                 h.mark_success()
                 raw = r.json()
@@ -206,13 +188,7 @@ class ComputeRouter:
             log.error("HF backend error", model=model_id, error=str(e))
             raise
 
-    async def call_runpod(
-        self,
-        endpoint_id: str,
-        model: str,
-        messages: list[dict],
-        **kwargs
-    ) -> dict:
+    async def call_runpod(self, endpoint_id: str, model: str, messages: list[dict], **kwargs) -> dict:
         """RunPod serverless — Ollama-compatible handler expected."""
         if not settings.runpod_api_key:
             raise RuntimeError("RUNPOD_API_KEY not configured")
@@ -224,11 +200,7 @@ class ComputeRouter:
         payload = {"input": {"model": model, "messages": messages, **kwargs}}
         try:
             async with httpx.AsyncClient(timeout=settings.request_timeout_secs) as client:
-                r = await client.post(
-                    f"{settings.runpod_api_url}/{endpoint_id}/runsync",
-                    headers=headers,
-                    json=payload
-                )
+                r = await client.post(f"{settings.runpod_api_url}/{endpoint_id}/runsync", headers=headers, json=payload)
                 r.raise_for_status()
                 h.mark_success()
                 data = r.json()
@@ -263,10 +235,7 @@ class ComputeRouter:
         h = self._health[Backend.OPENROUTER]
         try:
             async with httpx.AsyncClient(timeout=settings.request_timeout_secs) as client:
-                r = await client.post(
-                    f"{settings.openrouter_api_url}/chat/completions",
-                    headers=headers, json=payload
-                )
+                r = await client.post(f"{settings.openrouter_api_url}/chat/completions", headers=headers, json=payload)
                 r.raise_for_status()
                 h.mark_success()
                 raw = r.json()
@@ -285,11 +254,7 @@ class ComputeRouter:
     # ── Main routing entry point ──────────────────────────────────────────────
 
     async def route(
-        self,
-        model_role: str,
-        messages: list[dict],
-        force_backend: Backend | None = None,
-        **kwargs
+        self, model_role: str, messages: list[dict], force_backend: Backend | None = None, **kwargs
     ) -> dict:
         """
         Select backend → resolve model for role → call with fallback chain.
@@ -304,8 +269,7 @@ class ComputeRouter:
         Monitor (kimi-k2:1t-cloud) is NOT routed here — see services/monitor.py.
         """
         if model_role not in LOCAL_MODEL_MAP:
-            raise ValueError(f"Unknown model_role '{model_role}'. "
-                             f"Valid: {list(LOCAL_MODEL_MAP.keys())}")
+            raise ValueError(f"Unknown model_role '{model_role}'. Valid: {list(LOCAL_MODEL_MAP.keys())}")
 
         backend = self.select_backend(force_backend)
 
@@ -316,8 +280,7 @@ class ComputeRouter:
                 return OPENROUTER_MODEL_MAP[model_role]()
             return LOCAL_MODEL_MAP[model_role]()  # LOCAL and RUNPOD use local name
 
-        log.info("routing", role=model_role, backend=backend,
-                 model=_resolve_model(backend))
+        log.info("routing", role=model_role, backend=backend, model=_resolve_model(backend))
 
         # Fallback chain: chosen backend first, then rest of cloud_priority order
         if settings.compute_strategy == "cloud_priority":
@@ -327,8 +290,7 @@ class ComputeRouter:
             else:
                 fallback_chain = [backend] + list(CLOUD_PRIORITY_CHAIN)
         else:
-            fallback_chain = [backend, Backend.LOCAL, Backend.OPENROUTER,
-                              Backend.HF, Backend.RUNPOD]
+            fallback_chain = [backend, Backend.LOCAL, Backend.OPENROUTER, Backend.HF, Backend.RUNPOD]
             fallback_chain = list(dict.fromkeys(fallback_chain))  # dedup, preserve order
 
         last_err = None
@@ -352,14 +314,13 @@ class ComputeRouter:
                     result = await self.call_runpod(ep_id, attempt_model, messages, **kwargs)
 
                 result["_backend_used"] = attempt_backend
-                result["_model_used"]   = attempt_model
-                result["_role"]         = model_role
+                result["_model_used"] = attempt_model
+                result["_role"] = model_role
                 return result
 
             except Exception as e:
                 last_err = e
-                log.warning("backend failed, trying next",
-                            failed=attempt_backend, role=model_role, error=str(e))
+                log.warning("backend failed, trying next", failed=attempt_backend, role=model_role, error=str(e))
                 continue
 
         raise RuntimeError(f"All backends failed for role={model_role}: {last_err}")
