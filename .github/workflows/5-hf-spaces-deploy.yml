@@ -1,0 +1,33 @@
+name: "🚀 Deploy → HuggingFace Spaces"
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-hf-space:
+    name: Sync to MADdegens/Agent-Q3
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Push to HuggingFace Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config user.email "nicholasjmcleod@gmail.com"
+          git config user.name "MADdegen"
+
+          # Add HF Space remote
+          git remote add hf_space https://madDegen:${HF_TOKEN}@huggingface.co/spaces/MADdegens/Agent-Q3 || true
+
+          # Push — skip LFS objects (HF Space doesn't need IDE configs)
+          git push hf_space main --force \
+            -c lfs.skipDownload=true \
+            2>&1 || true
+
+          echo "Deployment triggered — Space will rebuild from latest main"
