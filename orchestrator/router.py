@@ -256,14 +256,16 @@ class ComputeRouter:
         """
         Select backend → resolve model for role → call with fallback chain.
 
-        Roles → local models:
-          reasoner        → Kimi-VL-A3B Q4_K_M            /v1/instruct /v1/chat
-          tandem          → Hermes3 8B                     /v1/tandem stage-2
-          coder           → Qwen3-48B-A4B-Savant           /v1/code /v1/tandem stage-3
-          fallback        → Qwopus3.6-27B                  /v1/fallback
-          coder_dedicated → Qwen3-Coder-30B-A3B            /v1/coder /v1/coder/review
+        Roles → Ollama Cloud models (nicholasjmcleod/ namespace):
+          reasoner        → kimi-linear:q6_k           /v1/instruct /v1/chat
+          tandem          → harmonic-hermes:q6_k        /v1/tandem stage-2
+          coder           → ultracoder:q4_k_m           /v1/code /v1/tandem stage-3
+          fallback        → qwopus:q8_0                 /v1/fallback
+          coder_dedicated → qwen3-coder-53b:q6_k        /v1/coder
+          genstruct       → genstruct:q6_k              /v1/generate
+          infinity_parser → infinity-parser:latest      /v1/parse
 
-        Monitor (kimi-k2:1t-cloud) is NOT routed here — see services/monitor.py.
+        Monitor (harmonic-hermes + ultracoder pair) is NOT routed here — see services/monitor.py.
         """
         if model_role not in LOCAL_MODEL_MAP:
             raise ValueError(f"Unknown model_role '{model_role}'. Valid: {list(LOCAL_MODEL_MAP.keys())}")
