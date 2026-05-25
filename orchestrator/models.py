@@ -1,7 +1,7 @@
 """
 Models & task classifier — Agent-Q3
 
-Classifies incoming prompts → routes to Reasoner (Gemma4-E4B) or Coder (Qwen3.5-4B)
+Routes incoming prompts → Reasoner (Kimi-Linear-48B) or Coder (Ultra-Coder-Brain / Qwen3-Coder-53B)
 """
 
 import re
@@ -19,7 +19,7 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[Message]
-    model_role: Literal["reasoner", "coder", "auto"] | None = "auto"
+    model_role: Literal["reasoner", "coder", "tandem", "fallback", "auto"] | None = "auto"
     force_backend: Literal["local", "huggingface", "runpod", "openrouter"] | None = None
     stream: bool = False
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
@@ -46,7 +46,6 @@ class HealthResponse(BaseModel):
 
 # ── Task classifier ───────────────────────────────────────────────────────────
 
-# Keywords that strongly indicate CODE / FETCH tasks → Qwen3.5-4B (Coder)
 CODER_SIGNALS = re.compile(
     r"\b("
     r"code|function|class|def |import |from .+ import|"
@@ -62,7 +61,6 @@ CODER_SIGNALS = re.compile(
     re.IGNORECASE,
 )
 
-# Keywords that strongly indicate REASONING / INSTRUCT tasks → Gemma4-E4B
 REASONER_SIGNALS = re.compile(
     r"\b("
     r"research|analyze|analyse|explain|compare|evaluate|"
@@ -82,7 +80,7 @@ def classify_task(messages: list[Message]) -> Literal["reasoner", "coder"]:
     Heuristic classifier: examines last user message to pick the right model.
     Coder wins on ties (faster for mixed tasks).
     """
-    text = " ".join(m.content for m in messages if m.role in ("user", "system"))[-2000:]  # last 2000 chars is enough
+    text = " ".join(m.content for m in messages if m.role in ("user", "system"))[-2000:]
 
     coder_hits = len(CODER_SIGNALS.findall(text))
     reasoner_hits = len(REASONER_SIGNALS.findall(text))
@@ -92,7 +90,6 @@ def classify_task(messages: list[Message]) -> Literal["reasoner", "coder"]:
     elif reasoner_hits > coder_hits:
         return "reasoner"
     else:
-        # Tie → default to coder (Qwen3.5-4B is faster on ambiguous tasks)
         return "coder"
 
 
@@ -101,7 +98,7 @@ def classify_task(messages: list[Message]) -> Literal["reasoner", "coder"]:
 REASONER_SYSTEM = """You are the Reasoning Agent in the Agent-Q3 system for MAD Gambit — a prediction conviction platform on Base L2.
 
 Your role: deep analysis, multi-step reasoning, research synthesis, strategic planning, and instructed output.
-You have access to the Coder agent for any technical implementation requests.
+Model: Kimi-Linear-48B-A3B-Instruct (Q6_K). You have access to the Coder agent for technical implementation.
 
 Be concise. Lead with the answer. Use specific numbers over adjectives.
 Never use: leverage, synergy, ecosystem play, unlock value, game-changing, utilize.
@@ -110,18 +107,34 @@ Never use: leverage, synergy, ecosystem play, unlock value, game-changing, utili
 CODER_SYSTEM = """You are the Multimodal Implementation Agent in the Agent-Q3 system for MAD Gambit.
 
 Your role: write precise code, fetch data, check code correctness, debug, and produce structured file output.
-Tech stack: React 18 + TypeScript, Hono/HonoX, Supabase, Solidity/Foundry, Arbitrum/Base L2, Alchemy AA-SDK.
+Tech stack: React 18 + TypeScript, Hono/HonoX, Redis, Solidity/Foundry, Arbitrum/Base L2, Alchemy AA-SDK.
 
 Return working code. No filler explanations unless asked.
 Prefer TypeScript for frontend/backend. Solidity for contracts. Python for scripts.
 """
 
-HERMES_SYSTEM = """You are Hermes, the deep reasoning partner in the Agent-Q3 tandem pipeline for MAD Gambit.
+HERMES_SYSTEM = """You are Harmonic-Hermes, the deep reasoning partner in the Agent-Q3 tandem pipeline for MAD Gambit.
 
-Your role: receive an initial analysis from Kimi-VL and reason through it rigorously.
+Your role: receive an initial analysis from Kimi-Linear-48B and reason through it rigorously.
 - Identify logical gaps, unstated assumptions, and edge cases
 - Sharpen the plan — be specific, remove ambiguity, add constraints
 - Output a concise, structured implementation plan ready for the coder agent
 
-Be precise. Be critical. Do not repeat the input — improve it.
+Model: Harmonic-Hermes-9B (Q6_K). Be precise. Be critical. Do not repeat the input — improve it.
+"""
+
+GENSTRUCT_SYSTEM = """You are the Structured Generation Agent in the Agent-Q3 system for MAD Gambit.
+
+Your role: generate structured data, templates, schemas, and formatted outputs from natural language instructions.
+Model: Genstruct-7B (Q6_K).
+
+Produce clean, valid structured output. Follow the format exactly as requested.
+"""
+
+INFINITY_PARSER_SYSTEM = """You are the Infinity Parser in the Agent-Q3 system for MAD Gambit.
+
+Your role: parse, extract, and transform complex documents, code, and data structures.
+Model: Infinity-Parser2-Pro.
+
+Extract all relevant information. Preserve structure. Flag ambiguities.
 """

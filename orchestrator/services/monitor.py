@@ -1,21 +1,22 @@
 """
-Agent-Q3 — Kimi K2 Always-On Monitor.
+Agent-Q3 — Always-On Monitor (Harmonic-Hermes + Ultra-Coder pair).
 
-Runs in its own container, outside the local Ollama orchestration. Polls every
-service's /health every 30s, stores a rolling hour of metrics, and uses
-Kimi K2 (moonshotai/kimi-k2 via OpenRouter cloud) to analyze anomalies and
-answer meta-questions about the stack.
+Harmonic-Hermes-9B watches the stack and produces analysis/insights.
+Ultra-Coder-Brain handles automated remediation suggestions.
+Both run via local Ollama — monitor is independent of the services it watches.
 
-Kimi K2 is called via direct HTTP — NOT through the local compute router —
-to keep this monitor independent of the very services it watches.
+Pair roles:
+  Harmonic-Hermes: anomaly analysis, root-cause diagnosis, health insights
+  Ultra-Coder:     remediation plans, fix suggestions, automated patch cycles
 
 Endpoints:
   GET  /                       — service info
-  GET  /health                 — monitor's own health + Kimi K2 reachability
+  GET  /health                 — monitor health + model reachability
   GET  /v1/monitor/status      — current state of all watched services
   GET  /v1/monitor/history     — raw metrics history per service
-  GET  /v1/monitor/events      — recent events (transitions, anomalies, K2 insights)
-  POST /v1/monitor/analyze     — send a query + snapshot to Kimi K2, return analysis
+  GET  /v1/monitor/events      — recent events (transitions, anomalies, insights)
+  POST /v1/monitor/analyze     — query Harmonic-Hermes for analysis
+  POST /v1/monitor/remediate   — query Ultra-Coder for remediation plan
   WS   /ws/live                — real-time event stream
 """
 
@@ -38,44 +39,54 @@ from ..memory import memory
 log = structlog.get_logger(__name__)
 
 
-MONITOR_SYSTEM = """You are the Agent-Q3 System Monitor powered by Kimi K2.
-Your role: watch the multi-container AI stack and produce smart, actionable insights.
+MONITOR_SYSTEM = """You are Harmonic-Hermes, the always-on system monitor for Agent-Q3 (MAD Gambit).
+
+Your role: watch the multi-container AI stack and produce smart, actionable diagnostic insights.
 
 Stack you monitor:
-- multimodal :8000 — Kimi-VL-A3B + Qwen3-48B-Savant + Qwopus + Hermes tandem
-- coder      :8001 — Qwen3-Coder-30B-A3B dedicated + Hermes review
-- research   :8002 — Perplexity / Exa / Tavily / Free / Polymarket synthesis
-- mcp-bridge :8004 — unified MCP server gateway
-- ollama     :11434 — shared model server, 5 models hot
+- multimodal  :8000  — Kimi-Linear-48B (reasoner) + Harmonic-Hermes (tandem) + Ultra-Coder (coder) + Qwopus (fallback)
+- coder       :8001  — Qwen3-Coder-53B TOTAL-RECALL (dedicated long-form coding)
+- research    :8002  — Perplexity / Exa / Tavily / Free / Polymarket synthesis
+- mcp-bridge  :8004  — unified MCP server gateway
+- ollama      :11434 — shared Ollama model server (7 models pulled from Ollama Cloud)
 
-When given metrics: identify patterns, root causes, and predict issues before they happen.
+When given metrics: identify patterns, root causes, and predict issues before they escalate.
 Be specific. Use latency numbers. Name the exact service and model. No filler.
+Output 4 bullets max for anomaly analysis. Flag the single highest-leverage check first.
+"""
+
+REMEDIATION_SYSTEM = """You are Ultra-Coder-Brain, the remediation agent for Agent-Q3 (MAD Gambit).
+
+Your role: receive a diagnosed anomaly from Harmonic-Hermes and produce a precise, actionable fix plan.
+
+Rules:
+- Output concrete shell commands or code patches, not advice
+- Prioritize zero-downtime fixes
+- For Ollama model failures: suggest `ollama pull` + container restart sequence
+- For service crashes: provide exact docker/uvicorn restart commands
+- For memory issues: provide Redis flush or TTL reduction commands
+- Never suggest changes that require a full stack rebuild unless unavoidable
 """
 
 
 def _parse_targets() -> dict[str, str]:
-    """Parse MONITOR_TARGETS env-style csv: 'http://multimodal:8000,http://ollama:11434'."""
     raw = settings.monitor_targets
     parsed: dict[str, str] = {}
     for item in raw.split(","):
         item = item.strip().rstrip("/")
         if not item:
             continue
-        # extract host-without-port as the friendly name
         host = item.replace("http://", "").replace("https://", "").split(":")[0]
         parsed[host] = item
     return parsed
 
 
 class MonitorState:
-    """In-memory rolling metrics + WebSocket pubsub."""
-
     def __init__(self):
-        # 120 readings × 30s = 1 hour history per service
         self.metrics: dict[str, deque] = {}
         self.events: deque = deque(maxlen=500)
         self.subscribers: set[asyncio.Queue] = set()
-        self.last_k2_analysis_ts: dict[str, float] = {}  # per-service rate limit
+        self.last_analysis_ts: dict[str, float] = {}
         self.started_at: float = time.time()
 
     def reading(self, name: str) -> deque:
@@ -106,8 +117,34 @@ class MonitorState:
 state = MonitorState()
 
 
+async def _call_ollama(model: str, messages: list[dict], temperature: float = 0.4, max_tokens: int = 1024) -> dict:
+    """Direct Ollama call — bypasses the compute router to keep monitor independent."""
+    async with httpx.AsyncClient(timeout=90) as client:
+        r = await client.post(
+            f"{settings.ollama_base_url}/api/chat",
+            json={
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": max_tokens,
+                },
+            },
+        )
+        r.raise_for_status()
+        raw = r.json()
+        return {
+            "content": raw.get("message", {}).get("content", ""),
+            "model": model,
+            "usage": {
+                "prompt_tokens": raw.get("prompt_eval_count"),
+                "completion_tokens": raw.get("eval_count"),
+            },
+        }
+
+
 async def _poll_one(name: str, base_url: str) -> dict:
-    """Hit /health (or / for ollama) and return a normalized reading."""
     health_path = "/" if "ollama" in base_url else "/health"
     started = time.time()
     record: dict[str, Any] = {
@@ -138,9 +175,8 @@ async def _poll_one(name: str, base_url: str) -> dict:
 
 
 async def _poll_loop():
-    """Background loop — polls every service every N seconds."""
     targets = _parse_targets()
-    log.info("monitor poll loop starting", targets=list(targets.keys()), interval=settings.kimi_k2_poll_interval_secs)
+    log.info("monitor poll loop starting", targets=list(targets.keys()), interval=settings.monitor_poll_interval_secs)
     while True:
         try:
             results = await asyncio.gather(
@@ -155,131 +191,87 @@ async def _poll_loop():
                 prev_status = state.last_state(name)
                 state.reading(name).append(record)
 
-                # Transition event
                 if prev_status and prev_status != record["status"]:
-                    await state.emit(
-                        {
-                            "kind": "transition",
-                            "service": name,
-                            "from": prev_status,
-                            "to": record["status"],
-                            "latency_ms": record["latency_ms"],
-                        }
-                    )
-                    # On down/degraded → trigger Kimi K2 analysis (rate-limited 5min/svc)
-                    if record["status"] != "up" and settings.has_kimi_k2():
-                        last = state.last_k2_analysis_ts.get(name, 0)
+                    await state.emit({
+                        "kind": "transition",
+                        "service": name,
+                        "from": prev_status,
+                        "to": record["status"],
+                        "latency_ms": record["latency_ms"],
+                    })
+                    # On down/degraded → trigger Hermes analysis (rate-limited 5min/svc)
+                    if record["status"] != "up":
+                        last = state.last_analysis_ts.get(name, 0)
                         if time.time() - last > 300:
-                            state.last_k2_analysis_ts[name] = time.time()
-                            asyncio.create_task(_k2_anomaly_analysis(name, record))
-                # Latency anomaly
+                            state.last_analysis_ts[name] = time.time()
+                            asyncio.create_task(_anomaly_analysis(name, record))
                 elif record["latency_ms"] and record["latency_ms"] > 10000:
-                    await state.emit(
-                        {
-                            "kind": "slow_response",
-                            "service": name,
-                            "latency_ms": record["latency_ms"],
-                        }
-                    )
+                    await state.emit({
+                        "kind": "slow_response",
+                        "service": name,
+                        "latency_ms": record["latency_ms"],
+                    })
         except Exception as e:
             log.error("poll loop iteration failed", error=str(e))
 
-        await asyncio.sleep(settings.kimi_k2_poll_interval_secs)
+        await asyncio.sleep(settings.monitor_poll_interval_secs)
 
 
-async def _call_kimi_k2(messages: list[dict], temperature: float = 0.4, max_tokens: int = 1024) -> dict:
-    """
-    Kimi K2 inference — tries Ollama Cloud first (kimi-k2:1t-cloud via signed-in
-    ollama instance), then falls back to OpenRouter (moonshotai/kimi-k2).
-    Bypasses the local router — monitor stays independent of services it watches.
-    """
-    # ── 1. Ollama Cloud (requires `ollama signin` on the ollama container) ──
-    if settings.ollama_cloud_enabled:
-        try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                r = await client.post(
-                    f"{settings.ollama_base_url}/api/chat",
-                    json={
-                        "model": settings.kimi_k2_model,
-                        "messages": messages,
-                        "stream": False,
-                        "options": {
-                            "temperature": temperature,
-                            "num_predict": max_tokens,
-                        },
-                    },
-                )
-                r.raise_for_status()
-                raw = r.json()
-                return {
-                    "choices": [
-                        {
-                            "message": raw.get("message", {"role": "assistant", "content": ""}),
-                        }
-                    ],
-                    "model": settings.kimi_k2_model,
-                    "_via": "ollama-cloud",
-                    "usage": {
-                        "prompt_tokens": raw.get("prompt_eval_count"),
-                        "completion_tokens": raw.get("eval_count"),
-                    },
-                }
-        except Exception as e:
-            log.warning("ollama-cloud kimi-k2 failed, falling back to openrouter", error=str(e))
-
-    # ── 2. OpenRouter fallback ──────────────────────────────────────────────
-    if not settings.openrouter_api_key:
-        raise RuntimeError("Kimi K2 unavailable: ollama-cloud failed AND OPENROUTER_API_KEY unset")
-    headers = {
-        "Authorization": f"Bearer {settings.openrouter_api_key}",
-        "HTTP-Referer": "https://github.com/MADdegen/Agent-Q3",
-        "X-Title": "Agent-Q3-Monitor",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": settings.kimi_k2_fallback_model,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-    }
-    async with httpx.AsyncClient(timeout=60) as client:
-        r = await client.post(f"{settings.kimi_k2_api_url}/chat/completions", headers=headers, json=payload)
-        r.raise_for_status()
-        out = r.json()
-        out["_via"] = "openrouter"
-        return out
-
-
-async def _k2_anomaly_analysis(service: str, record: dict) -> None:
-    """Triggered when a service transitions to down/degraded."""
+async def _anomaly_analysis(service: str, record: dict) -> None:
+    """Harmonic-Hermes diagnoses the anomaly, then Ultra-Coder produces remediation."""
     try:
         snapshot = _build_snapshot()
-        resp = await _call_kimi_k2(
-            [
+
+        # Stage 1: Harmonic-Hermes analysis
+        hermes_resp = await _call_ollama(
+            model=settings.monitor_model,
+            messages=[
                 {"role": "system", "content": MONITOR_SYSTEM},
                 {
                     "role": "user",
-                    "content": f"ANOMALY: service `{service}` is {record['status']}.\n\n"
-                    f"Latest reading: {record}\n\n"
-                    f"Stack snapshot:\n{snapshot}\n\n"
-                    f"Diagnose the most likely cause in ≤4 bullets. "
-                    f"Suggest the single highest-leverage check the operator should run first.",
+                    "content": (
+                        f"ANOMALY: service `{service}` is {record['status']}.\n\n"
+                        f"Latest reading: {record}\n\n"
+                        f"Stack snapshot:\n{snapshot}\n\n"
+                        "Diagnose in ≤4 bullets. Flag the single highest-leverage check first."
+                    ),
                 },
             ],
             temperature=0.3,
             max_tokens=512,
         )
-        msg = resp["choices"][0]["message"]["content"]
-        await state.emit(
-            {
-                "kind": "k2_insight",
-                "service": service,
-                "trigger": "anomaly",
-                "analysis": msg,
-            }
+        analysis = hermes_resp["content"]
+
+        # Stage 2: Ultra-Coder remediation plan
+        coder_resp = await _call_ollama(
+            model=settings.monitor_coder_model,
+            messages=[
+                {"role": "system", "content": REMEDIATION_SYSTEM},
+                {
+                    "role": "user",
+                    "content": (
+                        f"Service `{service}` is {record['status']}.\n\n"
+                        f"Harmonic-Hermes diagnosis:\n{analysis}\n\n"
+                        "Produce a precise remediation plan with exact commands."
+                    ),
+                },
+            ],
+            temperature=0.2,
+            max_tokens=512,
         )
+        remediation = coder_resp["content"]
+
+        await state.emit({
+            "kind": "monitor_insight",
+            "service": service,
+            "trigger": "anomaly",
+            "analysis": analysis,
+            "remediation": remediation,
+            "analysis_model": settings.monitor_model,
+            "remediation_model": settings.monitor_coder_model,
+        })
     except Exception as e:
-        log.warning("kimi K2 anomaly analysis failed", error=str(e))
+        log.warning("anomaly analysis failed", error=str(e))
 
 
 def _build_snapshot() -> dict:
@@ -300,15 +292,12 @@ def _build_snapshot() -> dict:
     return snap
 
 
-# ── FastAPI app ──────────────────────────────────────────────────────────────
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info(
         "Monitor starting",
-        kimi_k2_model=settings.kimi_k2_model,
-        k2_enabled=settings.has_kimi_k2(),
+        analysis_model=settings.monitor_model,
+        remediation_model=settings.monitor_coder_model,
         targets=_parse_targets(),
     )
     await memory.connect()
@@ -321,8 +310,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agent-Q3 Monitor",
-    description="Kimi K2 always-on system monitor (cloud, outside local orchestration)",
-    version="1.0.0",
+    description="Harmonic-Hermes (analysis) + Ultra-Coder-Brain (remediation) always-on monitor",
+    version="2.0.0",
     lifespan=lifespan,
 )
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -338,9 +327,9 @@ class AnalyzeRequest(BaseModel):
 async def root():
     return {
         "service": "Agent-Q3 Monitor",
-        "kimi_k2_model": settings.kimi_k2_model,
-        "kimi_k2_enabled": settings.has_kimi_k2(),
-        "poll_interval_secs": settings.kimi_k2_poll_interval_secs,
+        "analysis_model": settings.monitor_model,
+        "remediation_model": settings.monitor_coder_model,
+        "poll_interval_secs": settings.monitor_poll_interval_secs,
         "targets": _parse_targets(),
         "uptime_secs": round(time.time() - state.started_at, 1),
     }
@@ -348,20 +337,18 @@ async def root():
 
 @app.get("/health")
 async def health():
-    k2_ok = False
-    if settings.has_kimi_k2():
-        try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                r = await client.get(
-                    f"{settings.kimi_k2_api_url}/models",
-                    headers={"Authorization": f"Bearer {settings.openrouter_api_key}"},
-                )
-                k2_ok = r.status_code == 200
-        except Exception:
-            pass
+    hermes_ok = False
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(f"{settings.ollama_base_url}/api/tags")
+            if r.status_code == 200:
+                tags = [m["name"] for m in r.json().get("models", [])]
+                hermes_ok = any(settings.monitor_model.split("/")[-1] in t for t in tags)
+    except Exception:
+        pass
     return {
         "status": "ok",
-        "kimi_k2_reachable": k2_ok,
+        "hermes_reachable": hermes_ok,
         "memory_backend": memory.backend,
         "services_tracked": list(state.metrics.keys()),
         "uptime_secs": round(time.time() - state.started_at, 1),
@@ -391,15 +378,15 @@ async def events(limit: int = 50):
 
 @app.post("/v1/monitor/analyze")
 async def analyze(req: AnalyzeRequest):
-    if not settings.has_kimi_k2():
-        raise HTTPException(503, detail="OPENROUTER_API_KEY not set — Kimi K2 disabled")
+    """Harmonic-Hermes analysis of the stack or a specific query."""
     user_msg = req.query
     if req.include_metrics:
         user_msg += f"\n\nCurrent stack snapshot:\n{_build_snapshot()}"
         user_msg += f"\n\nLast 10 events:\n{list(state.events)[:10]}"
     try:
-        resp = await _call_kimi_k2(
-            [
+        resp = await _call_ollama(
+            model=settings.monitor_model,
+            messages=[
                 {"role": "system", "content": MONITOR_SYSTEM},
                 {"role": "user", "content": user_msg},
             ],
@@ -407,14 +394,43 @@ async def analyze(req: AnalyzeRequest):
             max_tokens=2048,
         )
     except Exception as e:
-        raise HTTPException(503, detail=f"Kimi K2 call failed: {e}")
-    content = resp["choices"][0]["message"]["content"]
-    await state.emit(
-        {"kind": "k2_insight", "trigger": "user_query", "query": req.query[:200], "analysis": content[:200]}
-    )
+        raise HTTPException(503, detail=f"Harmonic-Hermes call failed: {e}")
+
+    await state.emit({
+        "kind": "monitor_insight",
+        "trigger": "user_query",
+        "query": req.query[:200],
+        "analysis": resp["content"][:200],
+    })
     return {
-        "model": settings.kimi_k2_model,
-        "analysis": content,
+        "model": settings.monitor_model,
+        "analysis": resp["content"],
+        "usage": resp.get("usage", {}),
+    }
+
+
+@app.post("/v1/monitor/remediate")
+async def remediate(req: AnalyzeRequest):
+    """Ultra-Coder-Brain remediation plan for a diagnosed issue."""
+    user_msg = req.query
+    if req.include_metrics:
+        user_msg += f"\n\nCurrent stack snapshot:\n{_build_snapshot()}"
+    try:
+        resp = await _call_ollama(
+            model=settings.monitor_coder_model,
+            messages=[
+                {"role": "system", "content": REMEDIATION_SYSTEM},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.2,
+            max_tokens=2048,
+        )
+    except Exception as e:
+        raise HTTPException(503, detail=f"Ultra-Coder call failed: {e}")
+
+    return {
+        "model": settings.monitor_coder_model,
+        "remediation": resp["content"],
         "usage": resp.get("usage", {}),
     }
 
@@ -425,13 +441,11 @@ async def ws_live(ws: WebSocket):
     q: asyncio.Queue = asyncio.Queue(maxsize=64)
     state.subscribers.add(q)
     try:
-        await ws.send_json(
-            {
-                "kind": "hello",
-                "tracked": list(state.metrics.keys()),
-                "uptime_secs": round(time.time() - state.started_at, 1),
-            }
-        )
+        await ws.send_json({
+            "kind": "hello",
+            "tracked": list(state.metrics.keys()),
+            "uptime_secs": round(time.time() - state.started_at, 1),
+        })
         while True:
             event = await q.get()
             await ws.send_json(event)

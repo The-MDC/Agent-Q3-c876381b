@@ -2,18 +2,29 @@
 Agent-Q3 Orchestrator — Main FastAPI App
 MAD Gambit | github.com/MADdegen/Agent-Q3
 
-Model stack:
-  [1] Kimi-VL-A3B-Instruct i1 Q4_K_M  — primary instruct + vision  → /v1/instruct
-  [2] Hermes3 8B                        — tandem reasoning partner   → /v1/tandem (step 1)
-  [3] Qwen3-48B-A4B-Savant Q6_K        — primary multimodal         → /v1/code
-  [4] Qwopus3.6-27B Q8_0               — fallback multimodal        → /v1/fallback
+Model stack (all from MADdegens/Models HF bucket → pushed to Ollama Cloud):
+  [1] Kimi-Linear-48B-A3B Q6_K   — reasoning + multimodal + sub-agent dispatch  → /v1/instruct /v1/chat
+  [2] Harmonic-Hermes-9B Q6_K    — tandem refiner + always-on monitor            → /v1/tandem stage-2 + /v1/monitor
+  [3] Ultra-Coder-Brain Q4_K_M   — primary coder + monitor remediation           → /v1/code /v1/tandem stage-3
+  [4] Qwopus3.6-27B Q8_0         — full-precision fallback                       → /v1/fallback
+  [5] Qwen3-Coder-53B Q6_K       — dedicated long-form coding                   → /v1/coder
+  [6] Genstruct-7B Q6_K          — structured generation middleware              → /v1/generate
+  [7] Infinity-Parser2-Pro        — parsing/extraction middleware                 → /v1/parse
 
-Composite endpoints:
-  POST /v1/chat     — auto-classify → instruct or multimodal
-  POST /v1/instruct — force Kimi-VL (vision, long-ctx, agent tasks)
-  POST /v1/code     — force Qwen3-48B (multimodal, code, fetch)
-  POST /v1/tandem   — Kimi reasons → Hermes refines → Qwen implements
-  POST /v1/fallback — force Qwopus3.6-27B
+Pairs:
+  Execution pair:  Harmonic-Hermes + Ultra-Coder  (reason/refine → implement/fix)
+  Structure pair:  Genstruct + Infinity-Parser     (wrap all pipelines as pre/post middleware)
+
+Endpoints:
+  POST /v1/chat     — auto-classify → instruct/code/genstruct/parse
+  POST /v1/instruct — Kimi-Linear-48B (reasoning, vision, multimodal, sub-agent dispatch)
+  POST /v1/reason   — alias for /v1/instruct
+  POST /v1/code     — Ultra-Coder-Brain (primary coder)
+  POST /v1/coder    — Qwen3-Coder-53B TOTAL-RECALL (dedicated long-form coding)
+  POST /v1/tandem   — Kimi-Linear → Harmonic-Hermes → Ultra-Coder pipeline
+  POST /v1/fallback — Qwopus3.6-27B (full-precision fallback)
+  POST /v1/generate — Genstruct-7B (structured data + template generation)
+  POST /v1/parse    — Infinity-Parser2-Pro (document + data parsing)
   GET  /health      — all backends + loaded models
   GET  /metrics     — Prometheus
 """
@@ -29,7 +40,9 @@ from .config import settings
 from .memory import memory
 from .models import (
     CODER_SYSTEM,
+    GENSTRUCT_SYSTEM,
     HERMES_SYSTEM,
+    INFINITY_PARSER_SYSTEM,
     REASONER_SYSTEM,
     ChatRequest,
     ChatResponse,
@@ -47,10 +60,14 @@ log = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI):
     log.info(
         "Agent-Q3 starting",
-        instruct=settings.reasoner_model,
+        reasoner=settings.reasoner_model,
         tandem=settings.tandem_model,
-        multimodal=settings.coder_model,
+        coder=settings.coder_model,
+        coder_dedicated=settings.coder_dedicated_model,
         fallback=settings.fallback_model,
+        genstruct=settings.genstruct_model,
+        infinity_parser=settings.infinity_parser_model,
+        monitor_pair=f"{settings.monitor_model} + {settings.monitor_coder_model}",
         strategy=settings.compute_strategy,
     )
     await memory.connect()
@@ -65,11 +82,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Agent-Q3 Orchestrator",
     description=(
-        "4-model orchestrator: "
-        "Kimi-VL-A3B (instruct/vision) + Hermes3 (tandem) + "
-        "Qwen3-48B-A4B (multimodal) + Qwopus3.6-27B (fallback)"
+        "7-model orchestrator: Kimi-Linear-48B (multimodal) + Harmonic-Hermes-9B (tandem/monitor) + "
+        "Ultra-Coder-Brain (coder/remediation) + Qwopus-27B (fallback) + Qwen3-Coder-53B (dedicated) + "
+        "Genstruct-7B (structure) + Infinity-Parser2-Pro (parse)"
     ),
-    version="2.0.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 
@@ -86,15 +103,14 @@ Instrumentator().instrument(app).expose(app)
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _build_messages(
-    request: ChatRequest,
-    system_override: str | None = None,
-) -> list[dict]:
+def _build_messages(request: ChatRequest, system_override: str | None = None) -> list[dict]:
     msgs = []
     system = system_override or request.system_prompt
     if system and not any(m.role == "system" for m in request.messages):
         msgs.append({"role": "system", "content": system})
-    msgs.extend([m.model_dump() for m in request.messages])
+    for m in request.messages:
+        msg = m.model_dump(exclude_none=True)
+        msgs.append(msg)
     return msgs
 
 
@@ -112,25 +128,26 @@ def _extract_content(result: dict) -> str:
 async def root():
     return {
         "service": "Agent-Q3",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "docs": "/docs",
         "models": {
-            "instruct": settings.reasoner_model,
+            "reasoner": settings.reasoner_model,
             "tandem": settings.tandem_model,
-            "multimodal": settings.coder_model,
+            "coder": settings.coder_model,
+            "coder_dedicated": settings.coder_dedicated_model,
             "fallback": settings.fallback_model,
+            "genstruct": settings.genstruct_model,
+            "infinity_parser": settings.infinity_parser_model,
         },
-        "loaded": {
-            "memory_backend": memory.backend,
-            "skills": [s.to_dict() for s in skills.all],
-            "plugins": [p.to_dict() for p in plugins.all],
+        "monitor_pair": {
+            "analysis": settings.monitor_model,
+            "remediation": settings.monitor_coder_model,
         },
     }
 
 
 @app.get("/v1/loaded")
 async def loaded():
-    """Full inventory of models, skills, plugins, memory, and configured MCP servers."""
     import httpx as _httpx
 
     mcp_info: dict = {"reachable": False}
@@ -144,12 +161,15 @@ async def loaded():
 
     return {
         "models": {
-            "instruct": settings.reasoner_model,
+            "reasoner": settings.reasoner_model,
             "tandem": settings.tandem_model,
-            "multimodal": settings.coder_model,
-            "fallback": settings.fallback_model,
+            "coder": settings.coder_model,
             "coder_dedicated": settings.coder_dedicated_model,
-            "monitor_cloud": settings.kimi_k2_model,
+            "fallback": settings.fallback_model,
+            "genstruct": settings.genstruct_model,
+            "infinity_parser": settings.infinity_parser_model,
+            "monitor_analysis": settings.monitor_model,
+            "monitor_remediation": settings.monitor_coder_model,
         },
         "memory": {"backend": memory.backend, "alive": await memory.ping()},
         "skills": [s.to_dict() for s in skills.all],
@@ -160,7 +180,6 @@ async def loaded():
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
-    """Full health check — all backends + loaded Ollama models."""
     import httpx as _httpx
 
     ollama_ok = False
@@ -190,18 +209,26 @@ async def health():
 @app.post("/v1/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
-    Auto-classify → instruct (Kimi-VL) or multimodal (Qwen3-48B).
-    Override with model_role='reasoner'|'coder'|'tandem'|'fallback'.
-    Pin compute with force_backend='local'|'huggingface'|'runpod'.
+    Auto-classify → reasoner / coder / genstruct / infinity_parser.
+    Vision inputs (images in messages) always route to Kimi-Linear-48B.
+    Override with model_role. Pin compute with force_backend.
     """
     if request.model_role in (None, "auto"):
         role = classify_task(request.messages)
     else:
         role = request.model_role
 
-    system = REASONER_SYSTEM if role == "reasoner" else CODER_SYSTEM
+    system_map = {
+        "reasoner": REASONER_SYSTEM,
+        "coder": CODER_SYSTEM,
+        "coder_dedicated": CODER_SYSTEM,
+        "tandem": HERMES_SYSTEM,
+        "fallback": CODER_SYSTEM,
+        "genstruct": GENSTRUCT_SYSTEM,
+        "infinity_parser": INFINITY_PARSER_SYSTEM,
+    }
+    system = system_map.get(role, REASONER_SYSTEM)
     messages = _build_messages(request, system_override=system)
-
     force_backend = Backend(request.force_backend) if request.force_backend else None
 
     try:
@@ -227,8 +254,7 @@ async def chat(request: ChatRequest):
 
 @app.post("/v1/instruct", response_model=ChatResponse)
 async def instruct(request: ChatRequest):
-    """Force Kimi-VL-A3B — vision, long-context, agent, instruct tasks."""
-    request.model_role = "reasoner"
+    """Kimi-Linear-48B — reasoning, multimodal vision, long-context, sub-agent dispatch."""
     messages = _build_messages(request, system_override=REASONER_SYSTEM)
     force_backend = Backend(request.force_backend) if request.force_backend else None
     try:
@@ -252,13 +278,13 @@ async def instruct(request: ChatRequest):
 
 @app.post("/v1/reason", response_model=ChatResponse)
 async def reason(request: ChatRequest):
-    """Alias for /v1/instruct — forces Kimi-VL-A3B."""
+    """Alias for /v1/instruct."""
     return await instruct(request)
 
 
 @app.post("/v1/code", response_model=ChatResponse)
 async def code(request: ChatRequest):
-    """Force Qwen3-48B-A4B-Savant — primary multimodal, code, fetch, structured output."""
+    """Ultra-Coder-Brain — primary code execution, debugging, structured output."""
     messages = _build_messages(request, system_override=CODER_SYSTEM)
     force_backend = Backend(request.force_backend) if request.force_backend else None
     try:
@@ -280,9 +306,33 @@ async def code(request: ChatRequest):
     )
 
 
+@app.post("/v1/coder", response_model=ChatResponse)
+async def coder_dedicated(request: ChatRequest):
+    """Qwen3-Coder-53B TOTAL-RECALL — dedicated long-form code generation and review."""
+    messages = _build_messages(request, system_override=CODER_SYSTEM)
+    force_backend = Backend(request.force_backend) if request.force_backend else None
+    try:
+        result = await router.route(
+            model_role="coder_dedicated",
+            messages=messages,
+            force_backend=force_backend,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return ChatResponse(
+        content=_extract_content(result),
+        model_role="coder_dedicated",
+        model_used=result.get("_model_used", "unknown"),
+        backend_used=result.get("_backend_used", "unknown"),
+        usage=result.get("usage"),
+    )
+
+
 @app.post("/v1/fallback", response_model=ChatResponse)
 async def fallback(request: ChatRequest):
-    """Force Qwopus3.6-27B — fallback multimodal when primary is overloaded."""
+    """Qwopus3.6-27B Q8_0 — full-precision fallback for any role."""
     messages = _build_messages(request, system_override=CODER_SYSTEM)
     force_backend = Backend(request.force_backend) if request.force_backend else None
     try:
@@ -304,19 +354,68 @@ async def fallback(request: ChatRequest):
     )
 
 
+@app.post("/v1/generate", response_model=ChatResponse)
+async def generate(request: ChatRequest):
+    """Genstruct-7B — structured data, templates, schemas, training set generation."""
+    messages = _build_messages(request, system_override=GENSTRUCT_SYSTEM)
+    force_backend = Backend(request.force_backend) if request.force_backend else None
+    try:
+        result = await router.route(
+            model_role="genstruct",
+            messages=messages,
+            force_backend=force_backend,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return ChatResponse(
+        content=_extract_content(result),
+        model_role="genstruct",
+        model_used=result.get("_model_used", "unknown"),
+        backend_used=result.get("_backend_used", "unknown"),
+        usage=result.get("usage"),
+    )
+
+
+@app.post("/v1/parse", response_model=ChatResponse)
+async def parse(request: ChatRequest):
+    """Infinity-Parser2-Pro — document parsing, data extraction, structure transformation."""
+    messages = _build_messages(request, system_override=INFINITY_PARSER_SYSTEM)
+    force_backend = Backend(request.force_backend) if request.force_backend else None
+    try:
+        result = await router.route(
+            model_role="infinity_parser",
+            messages=messages,
+            force_backend=force_backend,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return ChatResponse(
+        content=_extract_content(result),
+        model_role="infinity_parser",
+        model_used=result.get("_model_used", "unknown"),
+        backend_used=result.get("_backend_used", "unknown"),
+        usage=result.get("usage"),
+    )
+
+
 @app.post("/v1/tandem", response_model=dict)
 async def tandem(request: ChatRequest):
     """
     3-stage tandem pipeline:
-      Stage 1 — Kimi-VL-A3B reads the prompt, produces analysis + plan (vision aware)
-      Stage 2 — Hermes3 refines the plan with deep reasoning
-      Stage 3 — Qwen3-48B-A4B implements the refined plan
+      Stage 1 — Kimi-Linear-48B: multimodal analysis + initial plan
+      Stage 2 — Harmonic-Hermes-9B: deep reasoning refinement
+      Stage 3 — Ultra-Coder-Brain: implementation
 
-    Use for complex tasks that need vision → reasoning → implementation.
+    Genstruct structures the final output if structured output is requested.
+    Infinity-Parser pre-processes complex inputs before Stage 1 if needed.
     """
     force_backend = Backend(request.force_backend) if request.force_backend else None
 
-    # Stage 1: Kimi-VL — read + initial analysis
+    # Stage 1: Kimi-Linear — multimodal analysis and planning
     kimi_msgs = _build_messages(request, system_override=REASONER_SYSTEM)
     try:
         kimi_result = await router.route(
@@ -328,17 +427,14 @@ async def tandem(request: ChatRequest):
         )
         kimi_analysis = _extract_content(kimi_result)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Kimi-VL (Stage 1) failed: {e}")
+        raise HTTPException(status_code=503, detail=f"Kimi-Linear (Stage 1) failed: {e}")
 
-    # Stage 2: Hermes3 — deep reasoning on Kimi's analysis
+    # Stage 2: Harmonic-Hermes — deep reasoning and refinement
     hermes_msgs = [
         {"role": "system", "content": HERMES_SYSTEM},
-        *[m.model_dump() for m in request.messages],
-        {"role": "assistant", "content": f"[Kimi-VL Analysis]\n{kimi_analysis}"},
-        {
-            "role": "user",
-            "content": "Reason through this carefully. Identify any gaps or improvements in the analysis above, then produce a precise, refined implementation plan.",
-        },
+        *[m.model_dump(exclude_none=True) for m in request.messages],
+        {"role": "assistant", "content": f"[Kimi-Linear Analysis]\n{kimi_analysis}"},
+        {"role": "user", "content": "Reason through this carefully. Identify gaps and produce a precise, refined implementation plan."},
     ]
     try:
         hermes_result = await router.route(
@@ -350,29 +446,29 @@ async def tandem(request: ChatRequest):
         )
         hermes_plan = _extract_content(hermes_result)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Hermes3 (Stage 2) failed: {e}")
+        raise HTTPException(status_code=503, detail=f"Harmonic-Hermes (Stage 2) failed: {e}")
 
-    # Stage 3: Qwen3-48B — implement the refined plan
-    qwen_msgs = [
+    # Stage 3: Ultra-Coder-Brain — implementation
+    coder_msgs = [
         {"role": "system", "content": CODER_SYSTEM},
-        *[m.model_dump() for m in request.messages],
+        *[m.model_dump(exclude_none=True) for m in request.messages],
         {
             "role": "assistant",
-            "content": f"[Kimi-VL Analysis]\n{kimi_analysis}\n\n[Hermes3 Refined Plan]\n{hermes_plan}",
+            "content": f"[Kimi-Linear Analysis]\n{kimi_analysis}\n\n[Harmonic-Hermes Plan]\n{hermes_plan}",
         },
         {"role": "user", "content": "Implement this precisely. Return working, production-ready output only."},
     ]
     try:
-        qwen_result = await router.route(
+        coder_result = await router.route(
             model_role="coder",
-            messages=qwen_msgs,
+            messages=coder_msgs,
             force_backend=force_backend,
             temperature=0.3,
             max_tokens=request.max_tokens,
         )
-        implementation = _extract_content(qwen_result)
+        implementation = _extract_content(coder_result)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Qwen3-48B (Stage 3) failed: {e}")
+        raise HTTPException(status_code=503, detail=f"Ultra-Coder (Stage 3) failed: {e}")
 
     return {
         "kimi_analysis": kimi_analysis,
@@ -380,8 +476,8 @@ async def tandem(request: ChatRequest):
         "implementation": implementation,
         "kimi_model": kimi_result.get("_model_used"),
         "hermes_model": hermes_result.get("_model_used"),
-        "qwen_model": qwen_result.get("_model_used"),
+        "coder_model": coder_result.get("_model_used"),
         "kimi_backend": kimi_result.get("_backend_used"),
         "hermes_backend": hermes_result.get("_backend_used"),
-        "qwen_backend": qwen_result.get("_backend_used"),
+        "coder_backend": coder_result.get("_backend_used"),
     }

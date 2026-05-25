@@ -1,29 +1,29 @@
 version: "3.9"
 
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 # Agent-Q3 — 8-container stack
-# ALL inference via Ollama Cloud (no local GGUFs, no GPU required)
-# Account: nicholasjmcleod@gmail.com / Device: LN-8RDGA90Ultra
-# ─────────────────────────────────────────────────────────────────────────────
+# Ollama Cloud model stack (nicholasjmcleod namespace)
+# =============================================================================
 #
-#  Cloud model → role mapping:
-#    kimi-vl:a3b-cloud           reasoner   /v1/instruct /v1/chat
-#    hermes3:8b-cloud            tandem     /v1/tandem stage-2
-#    qwen3:48b-a4b-cloud         coder      /v1/code /v1/tandem stage-3
-#    qwopus:27b-cloud            fallback   /v1/fallback
-#    qwen3-coder:30b-a3b-cloud   coder_ded  /v1/coder /v1/coder/review
-#    kimi-k2:1t-cloud            monitor    /v1/monitor/analyze
+#  Model → role mapping:
+#    nicholasjmcleod/kimi-linear:q6_k        reasoner    /v1/instruct /v1/chat (multimodal)
+#    nicholasjmcleod/harmonic-hermes:q6_k    tandem      /v1/tandem stage-2 + /v1/monitor analysis
+#    nicholasjmcleod/ultracoder:q4_k_m       coder       /v1/code /v1/tandem stage-3 + monitor remediation
+#    nicholasjmcleod/qwopus:q8_0             fallback    /v1/fallback
+#    nicholasjmcleod/qwen3-coder-53b:q6_k    coder_ded   /v1/coder
+#    nicholasjmcleod/genstruct:q6_k          genstruct   /v1/generate (structure middleware)
+#    nicholasjmcleod/infinity-parser:latest  parser      /v1/parse (parse middleware)
 #
 #  Containers:
-#    ollama       — Ollama Cloud proxy (signed-in, no local models)
+#    ollama       — Ollama Cloud proxy (nicholasjmcleod signed-in)
 #    redis        — shared memory (cache, sessions, events)
 #    mcp-bridge   — :8004  unified MCP gateway (.mcp.json)
-#    multimodal   — :8000  reasoner + tandem + coder + fallback
-#    coder        — :8001  coder_dedicated + tandem review
+#    multimodal   — :8000  reasoner + tandem + coder + fallback + genstruct + parser
+#    coder        — :8001  coder_dedicated (Qwen3-Coder-53B)
 #    research     — :8002  Perplexity/Exa/Tavily/Free/Polymarket + synthesis
-#    monitor      — :8003  Kimi K2 always-on monitor (kimi-k2:1t-cloud)
+#    monitor      — :8003  Harmonic-Hermes (analysis) + Ultra-Coder (remediation)
 #    open-webui   — :3000  GUI
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 
 x-app-base: &app-base
   build:
@@ -32,17 +32,20 @@ x-app-base: &app-base
   env_file:
     - .env
   environment:
-    OLLAMA_BASE_URL:        "http://ollama:11434"
-    REDIS_URL:              "redis://redis:6379/0"
-    COMPUTE_STRATEGY:       "cloud_priority"
-    REQUEST_TIMEOUT_SECS:   "300"
-    OLLAMA_CLOUD_ENABLED:   "true"
-    REASONER_MODEL:         "kimi-vl:a3b-cloud"
-    TANDEM_MODEL:           "hermes3:8b-cloud"
-    CODER_MODEL:            "qwen3:48b-a4b-cloud"
-    FALLBACK_MODEL:         "qwopus:27b-cloud"
-    CODER_DEDICATED_MODEL:  "qwen3-coder:30b-a3b-cloud"
-    KIMI_K2_MODEL:          "kimi-k2:1t-cloud"
+    OLLAMA_BASE_URL:          "http://ollama:11434"
+    REDIS_URL:                "redis://redis:6379/0"
+    COMPUTE_STRATEGY:         "cloud_priority"
+    REQUEST_TIMEOUT_SECS:     "300"
+    OLLAMA_CLOUD_ENABLED:     "true"
+    REASONER_MODEL:           "nicholasjmcleod/kimi-linear:q6_k"
+    TANDEM_MODEL:             "nicholasjmcleod/harmonic-hermes:q6_k"
+    CODER_MODEL:              "nicholasjmcleod/ultracoder:q4_k_m"
+    FALLBACK_MODEL:           "nicholasjmcleod/qwopus:q8_0"
+    CODER_DEDICATED_MODEL:    "nicholasjmcleod/qwen3-coder-53b:q6_k"
+    GENSTRUCT_MODEL:          "nicholasjmcleod/genstruct:q6_k"
+    INFINITY_PARSER_MODEL:    "nicholasjmcleod/infinity-parser:latest"
+    MONITOR_MODEL:            "nicholasjmcleod/harmonic-hermes:q6_k"
+    MONITOR_CODER_MODEL:      "nicholasjmcleod/ultracoder:q4_k_m"
   depends_on:
     redis:
       condition: service_healthy
@@ -56,7 +59,7 @@ x-app-base: &app-base
 
 services:
 
-  # ── Shared memory ────────────────────────────────────────────────────────────
+  # ── Shared memory ─────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: agent-q3-redis
@@ -71,9 +74,9 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # ── Ollama Cloud proxy ────────────────────────────────────────────────────────
-  # No local model storage. Device key at /root/.ollama/id_ed25519 enables
-  # all :cloud model passthrough to ollama.com.
+  # ── Ollama Cloud proxy ─────────────────────────────────────────────────────
+  # Device key at /root/.ollama/id_ed25519 enables cloud model pull.
+  # Models pulled from nicholasjmcleod namespace on Ollama Cloud.
   ollama:
     build:
       context: .
@@ -82,21 +85,21 @@ services:
     ports:
       - "11434:11434"
     volumes:
-      - ~/.ollama:/root/.ollama          # device key + cloud auth — no local GGUF storage
+      - ~/.ollama:/root/.ollama
     environment:
       OLLAMA_HOST:              "0.0.0.0"
       OLLAMA_ORIGINS:           "*"
       OLLAMA_KEEP_ALIVE:        "24h"
-      OLLAMA_MAX_LOADED_MODELS: "6"      # all 6 cloud sessions hot
+      OLLAMA_MAX_LOADED_MODELS: "7"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/"]
       interval: 15s
       timeout: 5s
       retries: 20
-      start_period: 30s                  # fast start — no local pulls needed
+      start_period: 60s
 
-  # ── MCP Bridge ───────────────────────────────────────────────────────────────
+  # ── MCP Bridge ────────────────────────────────────────────────────────────
   mcp-bridge:
     <<: *app-base
     container_name: agent-q3-mcp-bridge
@@ -110,7 +113,7 @@ services:
       timeout: 10s
       retries: 5
 
-  # ── [DOCKER 1] Multimodal ─────────────────────────────────────────────────────
+  # ── Multimodal — Kimi-Linear + Harmonic-Hermes + Ultra-Coder + Qwopus ────
   multimodal:
     <<: *app-base
     container_name: agent-q3-multimodal
@@ -124,7 +127,7 @@ services:
       timeout: 10s
       retries: 5
 
-  # ── [DOCKER 2] Dedicated Coder ────────────────────────────────────────────────
+  # ── Dedicated Coder — Qwen3-Coder-53B TOTAL-RECALL ───────────────────────
   coder:
     <<: *app-base
     container_name: agent-q3-coder
@@ -138,7 +141,7 @@ services:
       timeout: 10s
       retries: 5
 
-  # ── [DOCKER 3] Deep Research ──────────────────────────────────────────────────
+  # ── Deep Research ─────────────────────────────────────────────────────────
   research:
     <<: *app-base
     container_name: agent-q3-research
@@ -152,19 +155,19 @@ services:
       timeout: 10s
       retries: 5
 
-  # ── [DOCKER 4] Kimi K2 Always-On Monitor ─────────────────────────────────────
+  # ── Monitor — Harmonic-Hermes (analysis) + Ultra-Coder (remediation) ─────
   monitor:
     <<: *app-base
     container_name: agent-q3-monitor
     ports:
       - "8003:8003"
     environment:
-      OLLAMA_BASE_URL:    "http://ollama:11434"
-      REDIS_URL:          "redis://redis:6379/0"
-      KIMI_K2_MODEL:      "kimi-k2:1t-cloud"
-      OLLAMA_CLOUD_ENABLED: "true"
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      MONITOR_TARGETS: "http://multimodal:8000,http://coder:8001,http://research:8002,http://mcp-bridge:8004,http://ollama:11434"
+      OLLAMA_BASE_URL:        "http://ollama:11434"
+      REDIS_URL:              "redis://redis:6379/0"
+      MONITOR_MODEL:          "nicholasjmcleod/harmonic-hermes:q6_k"
+      MONITOR_CODER_MODEL:    "nicholasjmcleod/ultracoder:q4_k_m"
+      MONITOR_POLL_INTERVAL_SECS: "30"
+      MONITOR_TARGETS:        "http://multimodal:8000,http://coder:8001,http://research:8002,http://mcp-bridge:8004,http://ollama:11434"
     command: ["python", "-m", "uvicorn", "orchestrator.services.monitor:app",
               "--host", "0.0.0.0", "--port", "8003", "--log-level", "info"]
     healthcheck:
@@ -173,7 +176,7 @@ services:
       timeout: 10s
       retries: 5
 
-  # ── GUI: Open WebUI ────────────────────────────────────────────────────────────
+  # ── Open WebUI ────────────────────────────────────────────────────────────
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: agent-q3-webui
@@ -185,7 +188,7 @@ services:
       OLLAMA_BASE_URL:  "http://ollama:11434"
       WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-change-me-in-env}
       ENABLE_SIGNUP:    "true"
-      DEFAULT_MODELS:   "kimi-vl:a3b-cloud"
+      DEFAULT_MODELS:   "nicholasjmcleod/kimi-linear:q6_k"
     depends_on:
       ollama:
         condition: service_healthy
