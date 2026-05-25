@@ -3,8 +3,9 @@ set -e
 
 echo "╔════════════════════════════════════════════╗"
 echo "║         Agent Q3 - Ollama Stack            ║"
-echo "║  Reasoner: Qwen2.5-VL-32B  |  QwQ-32B    ║"
-echo "║  Support:  Qwen3-8B Kimi-K2 Distilled     ║"
+echo "║  Reasoner: Qwen2.5-VL-32B  Q8_0           ║"
+echo "║  Support:  Qwen3-8B Kimi-K2  F16           ║"
+echo "║  Coder:    QwQ-32B  Q8_0                   ║"
 echo "╚════════════════════════════════════════════╝"
 
 # Start Ollama server in background
@@ -34,9 +35,9 @@ pull_model() {
   fi
 }
 
-pull_model "${REASONER_MODEL:-hf.co/unsloth/Qwen2.5-VL-32B-Instruct-GGUF:Q4_K_M}" "Qwen2.5-VL-32B (Reasoner)"
-pull_model "${SUPPORT_MODEL:-hf.co/TeichAI/Qwen3-8B-Kimi-K2-Thinking-Distill-GGUF:Q4_K_M}" "Qwen3-8B Kimi-K2 (Support)"
-pull_model "${CODER_MODEL:-hf.co/unsloth/QwQ-32B-GGUF:Q4_K_M}" "QwQ-32B (Deep Research/Coder)"
+pull_model "${REASONER_MODEL:-hf.co/unsloth/Qwen2.5-VL-32B-Instruct-GGUF:Q8_0}" "Qwen2.5-VL-32B Q8_0 (Reasoner)"
+pull_model "${SUPPORT_MODEL:-hf.co/TeichAI/Qwen3-8B-Kimi-K2-Thinking-Distill-GGUF:F16}" "Qwen3-8B Kimi-K2 F16 (Support)"
+pull_model "${CODER_MODEL:-hf.co/unsloth/QwQ-32B-GGUF:Q8_0}" "QwQ-32B Q8_0 (Deep Research/Coder)"
 
 echo ""
 echo "✓ All models ready. Ollama running on :11434"

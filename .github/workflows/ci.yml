@@ -94,7 +94,7 @@ jobs:
           pytest tests/unit/ -v --cov=orchestrator --cov-report=xml \
             --cov-report=term-missing -x
         env:
-          REASONER_MODEL: "kimi-vl:a3b-cloud"
+          REASONER_MODEL: "moonshotai/Kimi-K2.6"
           CODER_MODEL: "qwen3:48b-a4b-cloud"
           COMPUTE_STRATEGY: "cloud_priority"
           OLLAMA_BASE_URL: "http://localhost:11434"
@@ -106,7 +106,7 @@ jobs:
           pytest tests/integration/ -v --timeout=120 -x
         env:
           TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
-          REASONER_MODEL: "kimi-vl:a3b-cloud"
+          REASONER_MODEL: "moonshotai/Kimi-K2.6"
           CODER_MODEL: "qwen3:48b-a4b-cloud"
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
@@ -169,7 +169,7 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
           build-args: |
-            REASONER_MODEL=kimi-vl:a3b-cloud
+            REASONER_MODEL=moonshotai/Kimi-K2.6
             CODER_MODEL=qwen3:48b-a4b-cloud
 
       - name: Image digest
@@ -177,58 +177,14 @@ jobs:
           echo "Digest: ${{ steps.build-push.outputs.digest }}"
           echo "Tags: ${{ steps.meta.outputs.tags }}"
 
-# ─────────────────────────────────────────────────────────────────────────────
-  deploy-railway:
-    name: Deploy → Railway (agent-q3-orchestrator)
-    runs-on: ubuntu-latest
-    needs: build-push
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-
-    steps:
-      - name: Trigger Railway redeploy
-        run: |
-          curl -s -X POST https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "query": "mutation { serviceInstanceDeploy(serviceId: \"${{ secrets.RAILWAY_SERVICE_ID }}\", environmentId: \"${{ secrets.RAILWAY_ENVIRONMENT_ID }}\") }"
-            }' | python3 -c "
-          import sys, json
-          r = json.load(sys.stdin)
-          if r.get('data',{}).get('serviceInstanceDeploy'):
-              print('Railway deploy triggered ✅')
-          else:
-              print('Railway deploy error:', r)
-              exit(1)
-          "
-
-      - name: Update Railway image source to new digest
-        run: |
-          DIGEST="${{ needs.build-push.outputs.image_digest }}"
-          IMAGE="ghcr.io/maddegen/agent-q3@${DIGEST}"
-          echo "Updating Railway service to image: $IMAGE"
-          curl -s -X POST https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"query\": \"mutation { serviceInstanceUpdate(serviceId: \\\"${{ secrets.RAILWAY_SERVICE_ID }}\\\", environmentId: \\\"${{ secrets.RAILWAY_ENVIRONMENT_ID }}\\\", input: { source: { image: \\\"${IMAGE}\\\" } }) }\"
-            }" | python3 -c "
-          import sys, json
-          r = json.load(sys.stdin)
-          if r.get('data',{}).get('serviceInstanceUpdate'):
-              print(f'Image pinned to digest ✅')
-          else:
-              print('Update warning:', r)
-          "
-
       - name: Deployment summary
         run: |
           echo "═══════════════════════════════════════════════════════"
-          echo "  Agent-Q3 deployed to Railway"
-          echo "  Orchestrator: https://agent-q3-staging.up.railway.app"
-          echo "  Reasoner    : kimi-vl:a3b-cloud"
+          echo "  Agent-Q3 image built and pushed to GHCR"
+          echo "  Reasoner    : moonshotai/Kimi-K2.6 (BF16, HF Router)"
           echo "  Support     : hermes3:8b-cloud"
           echo "  Coder       : qwen3:48b-a4b-cloud"
           echo "  Strategy    : ${{ github.event.inputs.compute_strategy || 'cloud_priority' }}"
-          echo "  Digest      : ${{ needs.build-push.outputs.image_digest }}"
+          echo "  Digest      : ${{ steps.build-push.outputs.digest }}"
+          echo "  Deploy      : see 5-hf-spaces-deploy.yml"
           echo "═══════════════════════════════════════════════════════"

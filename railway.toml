@@ -1,13 +1,3 @@
-[build]
-builder = "dockerfile"
-dockerfilePath = "Dockerfile"
-
-[deploy]
-startCommand = "/start.sh"
-healthcheckPath = "/health"
-healthcheckTimeout = 300
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3
-
-[[services]]
-name = "agent-q3-orchestrator"
+# DEPRECATED: Agent-Q3 no longer deploys to Railway.
+# Production deployment: HuggingFace Spaces (madDegen/agent-q3-space)
+# See: .github/workflows/5-hf-spaces-deploy.yml

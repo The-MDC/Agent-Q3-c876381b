@@ -5,11 +5,10 @@
 # Account: nicholasjmcleod@gmail.com / Device: LN-8RDGA90Ultra
 #
 # Routing chain:
-#   PRIMARY:    Ollama Cloud — 6 cloud sessions hot (zero local storage)
+#   PRIMARY:    Ollama Cloud — 5 cloud sessions hot (zero local storage)
 #   SECONDARY:  OpenRouter — cloud burst / fallback
-#   TERTIARY:   HuggingFace Router — frontier burst
+#   TERTIARY:   HuggingFace Router — frontier burst (Kimi-K2.6 BF16)
 #   QUATERNARY: RunPod Serverless — GPU scale-out (AMPERE_16, scale-to-zero)
-#   MONITOR:    kimi-k2:1t-cloud — always-on, outside main router
 # =============================================================================
 
 active_engine: "ollama_cloud"
@@ -21,12 +20,12 @@ ollama_cloud:
   account: "nicholasjmcleod@gmail.com"
   device:  "LN-8RDGA90Ultra"
   base_url: "http://ollama:11434"
-  max_sessions: 6
+  max_sessions: 5
   keep_alive: "24h"
   models:
     reasoner:
-      tag:       "kimi-vl:a3b-cloud"
-      role:      "primary instruct / vision / agent / long-ctx"
+      tag:       "moonshotai/Kimi-K2.6"
+      role:      "primary instruct / vision / multimodal / long-ctx (HF Router BF16)"
       services:  [multimodal]
       endpoints: [/v1/instruct, /v1/chat]
     tandem:
@@ -49,21 +48,15 @@ ollama_cloud:
       role:      "dedicated code generation (3B active MoE)"
       services:  [coder]
       endpoints: [/v1/coder, /v1/coder/review-stage1]
-    monitor:
-      tag:       "kimi-k2:1t-cloud"
-      role:      "always-on monitor — outside main router"
-      services:  [monitor]
-      endpoints: [/v1/monitor/analyze]
 
 # ── OpenRouter (secondary compute) ───────────────────────────────────────────
 openrouter:
   base_url: "https://openrouter.ai/api/v1"
   models:
-    reasoner:         "moonshotai/kimi-k2"
-    tandem:           "nousresearch/hermes-3-llama-3.1-8b"
-    coder:            "qwen/qwen3-coder-30b-a3b-instruct"
-    fallback:         "deepseek/deepseek-chat-v3-5"
-    monitor_fallback: "moonshotai/kimi-k2"
+    reasoner: "moonshotai/kimi-k2"
+    tandem:   "nousresearch/hermes-3-llama-3.1-8b"
+    coder:    "qwen/qwen3-coder-30b-a3b-instruct"
+    fallback: "deepseek/deepseek-chat-v3-5"
 
 # ── HuggingFace Router (tertiary compute) ────────────────────────────────────
 hf_router:

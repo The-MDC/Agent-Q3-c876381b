@@ -35,7 +35,7 @@ class TestClassifier:
 class TestSettings:
     def test_defaults(self):
         s = Settings()
-        assert s.reasoner_model == "kimi-vl:a3b-cloud"
+        assert s.reasoner_model == "moonshotai/Kimi-K2.6"
         assert s.coder_model == "qwen3:48b-a4b-cloud"
         assert s.local_weight == 60
         assert s.hf_weight == 15
