@@ -14,9 +14,10 @@ Endpoints:
   GET  /cowork/memory/search  — semantic memory search
 
 MCP Tools exposed to Claude Cowork:
-  - agent_q3_reason    — send to Qwen2.5-VL-32B reasoner
-  - agent_q3_research  — send to QwQ-32B deep research
-  - agent_q3_support   — send to Qwen3-8B-Kimi support
+  - agent_q3_reason    — Kimi-Linear-48B multimodal reasoner
+  - agent_q3_code      — Ultra-Coder-Brain (primary coder)
+  - agent_q3_tandem    — Full tandem pipeline (Kimi → Hermes → Ultra-Coder)
+  - agent_q3_research  — Qwen3-Coder-53B TOTAL-RECALL (long-form dedicated)
   - memory_save        — persist a memory
   - memory_search      — semantic memory retrieval
   - deep_research      — Perplexity sonar-deep-research
@@ -40,22 +41,34 @@ router = APIRouter(prefix="/cowork", tags=["cowork"])
 compute = ComputeRouter()
 memory = MemoryStore()
 
-AGENT_Q3_VERSION = "0.3.0"
+AGENT_Q3_VERSION = "3.0.0"
 
 # -- Capability manifest -----------------------------------------------------
 CAPABILITIES = {
     "name": "Agent-Q3",
     "version": AGENT_Q3_VERSION,
-    "description": "Triple-model AI agent: Qwen2.5-VL-32B (reasoner) + Qwen3-8B-Kimi (support) + QwQ-32B (coder/research)",
+    "description": (
+        "7-model Ollama Cloud orchestrator: "
+        "Kimi-Linear-48B (reasoner/multimodal) + Harmonic-Hermes-9B (tandem/monitor) + "
+        "Ultra-Coder-Brain (coder/remediate) + Qwopus3.6-27B (fallback) + "
+        "Qwen3-Coder-53B (dedicated coder) + Genstruct-7B + Infinity-Parser2-Pro (middleware)"
+    ),
     "models": {
-        "reasoner": settings.reasoner_model,
-        "support": settings.support_model,
-        "coder": settings.coder_model,
+        "reasoner":        settings.reasoner_model,
+        "tandem":          settings.tandem_model,
+        "coder":           settings.coder_model,
+        "fallback":        settings.fallback_model,
+        "coder_dedicated": settings.coder_dedicated_model,
+        "genstruct":       settings.genstruct_model,
+        "parser":          settings.infinity_parser_model,
+        "monitor_analysis":    settings.monitor_model,
+        "monitor_remediation": settings.monitor_coder_model,
     },
     "tools": [
         "agent_q3_reason",
+        "agent_q3_code",
+        "agent_q3_tandem",
         "agent_q3_research",
-        "agent_q3_support",
         "memory_save",
         "memory_search",
         "deep_research",
@@ -66,14 +79,16 @@ CAPABILITIES = {
     "openai_compat_endpoint": "/cowork/chat",
     "memory": {
         "short_term": "Redis (24h TTL)",
-        "long_term": "Postgres pgvector (384-dim nomic-embed-text)",
     },
 }
 
 MCP_TOOLS = [
     {
         "name": "agent_q3_reason",
-        "description": "Send a prompt to the Qwen2.5-VL-32B multimodal reasoner. Best for: deep analysis, vision tasks, complex reasoning.",
+        "description": (
+            "Send a prompt to Kimi-Linear-48B multimodal reasoner. "
+            "Best for: deep analysis, vision tasks, complex reasoning, prediction market research."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -85,8 +100,27 @@ MCP_TOOLS = [
         },
     },
     {
-        "name": "agent_q3_research",
-        "description": "Send a prompt to QwQ-32B deep research model (131K context). Best for: long-form research, code analysis, multi-step reasoning.",
+        "name": "agent_q3_code",
+        "description": (
+            "Send a prompt to Ultra-Coder-Brain. "
+            "Best for: writing code, debugging, implementing contracts, file ops."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string"},
+                "system": {"type": "string"},
+                "temperature": {"type": "number", "default": 0.3},
+            },
+            "required": ["prompt"],
+        },
+    },
+    {
+        "name": "agent_q3_tandem",
+        "description": (
+            "Run the full tandem pipeline: Kimi-Linear reasons → Harmonic-Hermes refines → Ultra-Coder implements. "
+            "Best for: complex tasks requiring analysis + implementation."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {"prompt": {"type": "string"}, "system": {"type": "string"}},
@@ -94,8 +128,11 @@ MCP_TOOLS = [
         },
     },
     {
-        "name": "agent_q3_support",
-        "description": "Send a prompt to Qwen3-8B Kimi-K2 distilled support model. Best for: fast instruct, hybrid reasoning, quick answers.",
+        "name": "agent_q3_research",
+        "description": (
+            "Send a prompt to Qwen3-Coder-53B TOTAL-RECALL (long-form dedicated coder). "
+            "Best for: long research tasks, large codebase analysis, extended context work."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {"prompt": {"type": "string"}, "system": {"type": "string"}},
@@ -104,7 +141,7 @@ MCP_TOOLS = [
     },
     {
         "name": "memory_save",
-        "description": "Save a memory to Agent-Q3 persistent memory (Redis + Postgres pgvector).",
+        "description": "Save a memory to Agent-Q3 persistent memory (Redis 24h TTL).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -117,7 +154,7 @@ MCP_TOOLS = [
     },
     {
         "name": "memory_search",
-        "description": "Semantic search over Agent-Q3 long-term memory.",
+        "description": "Search Agent-Q3 memory store.",
         "inputSchema": {
             "type": "object",
             "properties": {"query": {"type": "string"}, "k": {"type": "integer", "default": 5}},
@@ -129,13 +166,16 @@ MCP_TOOLS = [
         "description": "Run Perplexity sonar-deep-research for comprehensive multi-step web research with citations.",
         "inputSchema": {
             "type": "object",
-            "properties": {"query": {"type": "string"}, "model": {"type": "string", "default": "sonar-deep-research"}},
+            "properties": {
+                "query": {"type": "string"},
+                "model": {"type": "string", "default": "sonar-deep-research"},
+            },
             "required": ["query"],
         },
     },
     {
         "name": "web_search",
-        "description": "Multi-provider web search (Exa, Tavily, Brave, DuckDuckGo fallback).",
+        "description": "Multi-provider web search (Exa, Tavily, DuckDuckGo fallback).",
         "inputSchema": {
             "type": "object",
             "properties": {"query": {"type": "string"}, "num_results": {"type": "integer", "default": 10}},
@@ -185,26 +225,34 @@ async def mcp_tool_call(call: MCPToolCall):
     args = call.arguments
 
     if call.name == "agent_q3_reason":
-        resp = await compute.chat(
-            messages=[{"role": "user", "content": args["prompt"]}],
+        resp = await compute.route(
             model_role="reasoner",
+            messages=[{"role": "user", "content": args["prompt"]}],
             temperature=args.get("temperature", 0.7),
         )
-        return {"content": [{"type": "text", "text": str(resp)}]}
+        return {"content": [{"type": "text", "text": str(resp.get("message", {}).get("content", str(resp)))}]}
+
+    elif call.name == "agent_q3_code":
+        resp = await compute.route(
+            model_role="coder",
+            messages=[{"role": "user", "content": args["prompt"]}],
+            temperature=args.get("temperature", 0.3),
+        )
+        return {"content": [{"type": "text", "text": str(resp.get("message", {}).get("content", str(resp)))}]}
+
+    elif call.name == "agent_q3_tandem":
+        resp = await compute.route(
+            model_role="tandem",
+            messages=[{"role": "user", "content": args["prompt"]}],
+        )
+        return {"content": [{"type": "text", "text": str(resp.get("message", {}).get("content", str(resp)))}]}
 
     elif call.name == "agent_q3_research":
-        resp = await compute.chat(
+        resp = await compute.route(
+            model_role="coder_dedicated",
             messages=[{"role": "user", "content": args["prompt"]}],
-            model_role="coder",
         )
-        return {"content": [{"type": "text", "text": str(resp)}]}
-
-    elif call.name == "agent_q3_support":
-        resp = await compute.chat(
-            messages=[{"role": "user", "content": args["prompt"]}],
-            model_role="support",
-        )
-        return {"content": [{"type": "text", "text": str(resp)}]}
+        return {"content": [{"type": "text", "text": str(resp.get("message", {}).get("content", str(resp)))}]}
 
     elif call.name == "memory_save":
         mem_id = await memory.save(
