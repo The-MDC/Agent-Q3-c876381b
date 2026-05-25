@@ -126,7 +126,7 @@ tools:
     mad_gambit: true
   dataset_bucket:
     hf_repo: "madDegen/agent-q3"
-    status:  "parquet_failing"   # TODO: fix dataset generation (500 on viewer)
+    status:  "parquet_failing"
     contents:
       - "hq/exports/  — Solidity, prediction markets, LangGraph JSONL"
       - "hq/feedback/ — RLHF/DPO feedback signals"

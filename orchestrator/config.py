@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     #   fallback        qwopus:27b-cloud             /v1/fallback
     #   coder_dedicated qwen3-coder:30b-a3b-cloud    /v1/coder /v1/coder/review
     reasoner_model:        str = "moonshotai/Kimi-K2.6"
+    support_model:         str = "hf.co/TeichAI/Qwen3-8B-Kimi-K2-Thinking-Distill-GGUF:F16"
     tandem_model:          str = "hermes3:8b-cloud"
     coder_model:           str = "qwen3:48b-a4b-cloud"
     fallback_model:        str = "qwopus:27b-cloud"

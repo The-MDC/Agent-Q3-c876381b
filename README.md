@@ -26,20 +26,19 @@ GET  /cowork/memory/ → Memory read/write (Redis 24h TTL)
 │                  Agent Q3 Container                  │
 │                                                      │
 │  Ollama :11434                                       │
-│  ├── Qwen2.5-VL-32B-Instruct-Q4_K_M  (Reasoner)    │
-│  ├── Qwen3-8B-Kimi-K2-Thinking-Q4_K_M (Support)    │
-│  └── QwQ-32B-Q4_K_M                  (Coder)       │
+│  ├── Kimi-K2.6 BF16          (Reasoner, HF Router)  │
+│  ├── Qwen3-8B-Kimi-K2  F16  (Support, local GGUF)  │
+│  └── QwQ-32B  Q8_0          (Coder, local GGUF)    │
 │                                                      │
-│  Orchestrator FastAPI :8000                          │
+│  Orchestrator FastAPI :7860                          │
 │  └── ComputeRouter                                   │
-│       ├── Railway  (Ollama GPU volume)               │
-│       ├── HuggingFace Router                         │
+│       ├── HuggingFace Router (Kimi-K2.6 BF16)       │
+│       ├── Ollama Cloud (5 cloud models)              │
 │       ├── RunPod   (serverless GPU)                  │
 │       └── OpenRouter (fallback)                      │
 │                                                      │
 │  Memory                                              │
-│  ├── Redis    (short-term, 24h TTL)                  │
-│  └── Postgres pgvector (long-term, 384-dim)          │
+│  └── Redis (24h TTL)                                 │
 └──────────────────────────────────────────────────────┘
 ```
 
