@@ -31,8 +31,8 @@ from typing import Any, Optional, List
 from orchestrator.config import settings
 from orchestrator.router import ComputeRouter
 from orchestrator.tools.memory_store import MemoryStore
-from orchestrator.tools.perplexity_search import perplexity_deep_research
-from orchestrator.tools.web_search import multi_search
+from orchestrator.tools.perplexity_search import deep_research as perplexity_deep_research
+from orchestrator.tools.web_search import web_search as multi_search
 from orchestrator.tools.prediction_markets import get_polymarket_markets
 
 router = APIRouter(prefix="/cowork", tags=["cowork"])
