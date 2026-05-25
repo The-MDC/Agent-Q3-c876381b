@@ -13,7 +13,7 @@ echo "╔═══════════════════════�
 echo "║              Agent Q3 — Cloud Model Stack                   ║"
 echo "║  Kimi-Linear-48B · Harmonic-Hermes-9B · Ultra-Coder-Brain   ║"
 echo "║  Qwopus-27B · Qwen3-Coder-53B · Genstruct-7B               ║"
-echo "║  Infinity-Parser2-Pro · [Monitor: Kimi-K2 1T Cloud]        ║"
+echo "║  Infinity-Parser2-Pro · Monitor: Hermes+UltraCoder pair     ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 
 # ── Start Ollama ──────────────────────────────────────────────────────────────
@@ -51,8 +51,8 @@ create_and_push() {
 
   # Download GGUF from bucket if not cached
   if [ ! -f "$local_path" ]; then
-    echo " ↓ Downloading $display_name from HF bucket..."
-    "$HF_BIN" buckets cp "hf://buckets/$BUCKET/$gguf_file" "$local_path"
+    echo " ↓ Syncing $display_name from HF bucket..."
+    "$HF_BIN" sync "hf://buckets/$BUCKET" "$MODELS_DIR" --include "$gguf_file"
     echo " ✓ Downloaded $gguf_file"
   else
     echo " ✓ $display_name GGUF cached at $local_path"
@@ -121,10 +121,18 @@ declare -A DISPLAY_NAMES=(
 ROLES=("reasoner" "tandem" "coder" "fallback" "coder_dedicated" "genstruct" "infinity_parser")
 
 if [ "${BOOTSTRAP_MODE:-false}" = "true" ]; then
-  # ── BOOTSTRAP: push all models to Ollama Cloud ──────────────────────────────
+  # ── BOOTSTRAP: sync all GGUFs from HF bucket, create + push to Ollama Cloud ─
   echo ""
-  echo "=== BOOTSTRAP MODE: Pushing models to Ollama Cloud ==="
+  echo "=== BOOTSTRAP MODE: Syncing models from HF bucket → Ollama Cloud ==="
   echo ""
+
+  # Sync the entire MADdegens/Models bucket to local models dir in one pass
+  echo " ↓ Syncing all GGUFs from hf://buckets/$BUCKET → $MODELS_DIR ..."
+  mkdir -p "$MODELS_DIR"
+  "$HF_BIN" sync "hf://buckets/$BUCKET" "$MODELS_DIR"
+  echo " ✓ Bucket synced to $MODELS_DIR"
+  echo ""
+
   for role in "${ROLES[@]}"; do
     gguf="${MODEL_GGUFS[$role]}"
     local_tag="${LOCAL_TAGS[$role]}"
