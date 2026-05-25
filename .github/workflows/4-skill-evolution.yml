@@ -27,6 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install HF CLI
+        run: pip install hf huggingface_hub -q
+
       - name: Scan The-MDC org for new agent frameworks
         if: ${{ github.event.inputs.scan_mode == 'all' || github.event.inputs.scan_mode == 'skills' || github.event_name == 'schedule' }}
         run: |
@@ -103,18 +110,20 @@ jobs:
                   print(f"- RunPod check failed: {e}")
           PYEOF
 
-      - name: Check Ollama model updates for tandem stack
+      - name: Check Ollama Cloud model updates for Agent-Q3 stack
         if: ${{ github.event.inputs.scan_mode == 'all' || github.event.inputs.scan_mode == 'models' || github.event_name == 'schedule' }}
         run: |
-          echo "## Ollama Model Updates — Tandem Stack"
-          echo "Tracking: gemma4, qwen3.5, ministral, qwen3"
-          for model in gemma4 qwen3.5 ministral qwen3; do
-            echo "- $model: https://ollama.com/library/$model"
-          done
+          echo "## Ollama Cloud — nicholasjmcleod/ Stack"
+          echo "Current deployed (nicholasjmcleod/ namespace):"
+          echo "  - Reasoner:         nicholasjmcleod/kimi-linear:q6_k"
+          echo "  - Tandem+Monitor:   nicholasjmcleod/harmonic-hermes:q6_k"
+          echo "  - Coder+Remediate:  nicholasjmcleod/ultracoder:q4_k_m"
+          echo "  - Fallback:         nicholasjmcleod/qwopus:q8_0"
+          echo "  - Coder Dedicated:  nicholasjmcleod/qwen3-coder-53b:q6_k"
+          echo "  - Genstruct:        nicholasjmcleod/genstruct:q6_k"
+          echo "  - Parser:           nicholasjmcleod/infinity-parser:latest"
           echo ""
-          echo "Current deployed:"
-          echo "  - Reasoner: gemma4:e4b-instruct-q4_K_M"
-          echo "  - Coder:    qwen3.5:4b-instruct-q4_K_M"
+          echo "Source bucket: MADdegens/Models (HF)"
 
       - name: Check HuggingFace router new model support
         run: |
@@ -153,11 +162,10 @@ jobs:
               '- [ ] New Ollama tags — any Q4_K_M variants better than current?',
               '- [ ] HF router providers — new compute backends worth routing to?',
               '',
-              '## 🧠 Tandem Container — Current State',
+              '## 🧠 Agent-Q3 — Current State',
               '| Service | URL |',
               '|---------|-----|',
-              '| Pair container | `https://ollama-gemma4-qwen35-pair-staging.up.railway.app` |',
-              '| OpenWebUI | `https://open-webui-gateway-staging.up.railway.app` |',
+              '| Orchestrator | `https://huggingface.co/spaces/MADdegens/Agent-Q3` |',
               '| RunPod endpoint | `kukl55t0053lob` |',
               '',
               '## 🛠 Upgrade a tool',

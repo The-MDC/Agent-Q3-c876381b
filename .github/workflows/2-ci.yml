@@ -22,8 +22,8 @@ env:
   DATABASE_URL: "postgresql://stub:stub@localhost:5432/stub"
   REDIS_URL: "redis://stub:6379"
   PORT: "8000"
-  REASONER_MODEL: "gemma4:e4b-instruct-q4_K_M"
-  CODER_MODEL: "qwen3.5:4b-instruct-q4_K_M"
+  REASONER_MODEL: "nicholasjmcleod/kimi-linear:q6_k"
+  CODER_MODEL: "nicholasjmcleod/ultracoder:q4_k_m"
   COMPUTE_STRATEGY: "local_first"
 
 jobs:
@@ -38,6 +38,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
+
+      - name: Install HF CLI
+        run: pip install hf huggingface_hub -q
 
       - name: Install ruff
         run: pip install ruff

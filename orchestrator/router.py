@@ -1,8 +1,9 @@
 """
 Compute Router — Agent-Q3
-Local GGUF stack: Kimi-VL-A3B (reasoner) + Hermes3-8B (tandem) + Qwen3-48B-Savant (coder)
-                  Qwopus3.6-27B (fallback) + Qwen3-Coder-30B-A3B (coder_dedicated)
-Monitor: kimi-k2:1t-cloud (Ollama Cloud — outside this router)
+Ollama Cloud stack (nicholasjmcleod/ namespace):
+  kimi-linear:q6_k (reasoner) + harmonic-hermes:q6_k (tandem/monitor) + ultracoder:q4_k_m (coder/remediate)
+  qwopus:q8_0 (fallback) + qwen3-coder-53b:q6_k (coder_dedicated) + genstruct:q6_k + infinity-parser:latest
+OpenRouter: moonshotai/kimi-k2.6 (sole fallback model — multimodal capable)
 Priority chain: Local Ollama → OpenRouter → HuggingFace → RunPod
 """
 
@@ -45,34 +46,30 @@ class BackendHealth:
         return time.time() - self.last_check > self.check_interval_secs
 
 
-# Maps model role → local Ollama GGUF model string
-#   reasoner        Kimi-VL-A3B Q4_K_M         — primary instruct / vision / agent
-#   tandem          Hermes3 8B                  — reasoning partner / tandem stage-2
-#   coder           Qwen3-48B-A4B-Savant        — primary multimodal / tandem stage-3
-#   fallback        Qwopus3.6-27B               — fallback multimodal
-#   coder_dedicated Qwen3-Coder-30B-A3B         — dedicated coder service
 LOCAL_MODEL_MAP = {
-    "reasoner": lambda: settings.reasoner_model,
-    "tandem": lambda: settings.tandem_model,
-    "coder": lambda: settings.coder_model,
-    "fallback": lambda: settings.fallback_model,
-    "coder_dedicated": lambda: settings.coder_dedicated_model,
+    "reasoner":         lambda: settings.reasoner_model,
+    "tandem":           lambda: settings.tandem_model,
+    "coder":            lambda: settings.coder_model,
+    "fallback":         lambda: settings.fallback_model,
+    "coder_dedicated":  lambda: settings.coder_dedicated_model,
+    "genstruct":        lambda: settings.genstruct_model,
+    "infinity_parser":  lambda: settings.infinity_parser_model,
 }
 
 HF_MODEL_MAP = {
-    "reasoner": lambda: settings.hf_reasoner_model,
-    "tandem": lambda: settings.hf_tandem_model,
-    "coder": lambda: settings.hf_coder_model,
-    "fallback": lambda: settings.hf_coder_model,
-    "coder_dedicated": lambda: settings.hf_frontier_coder,
+    "reasoner":         lambda: settings.hf_reasoner_model,
+    "tandem":           lambda: settings.hf_tandem_model,
+    "coder":            lambda: settings.hf_coder_model,
+    "fallback":         lambda: settings.hf_coder_model,
+    "coder_dedicated":  lambda: settings.hf_frontier_coder,
+    "genstruct":        lambda: settings.hf_tandem_model,
+    "infinity_parser":  lambda: settings.hf_tandem_model,
 }
 
+# OpenRouter uses a single capable multimodal model for all roles
 OPENROUTER_MODEL_MAP = {
-    "reasoner": lambda: settings.openrouter_reasoner_model,
-    "tandem": lambda: settings.openrouter_tandem_model,
-    "coder": lambda: settings.openrouter_coder_model,
-    "fallback": lambda: settings.openrouter_fallback_model,
-    "coder_dedicated": lambda: settings.openrouter_coder_model,
+    role: (lambda: settings.openrouter_model)
+    for role in ("reasoner", "tandem", "coder", "fallback", "coder_dedicated", "genstruct", "infinity_parser")
 }
 
 # cloud_priority fallback chain: LOCAL → OPENROUTER → HF → RUNPOD
@@ -84,7 +81,7 @@ class ComputeRouter:
     Routes inference across Local Ollama / OpenRouter / HuggingFace Router / RunPod.
     Primary: 5-model local GGUF stack (pulled from HuggingFace via Ollama).
     Fallback chain (cloud_priority): LOCAL → OPENROUTER → HF → RUNPOD.
-    Monitor (kimi-k2:1t-cloud) is handled separately in services/monitor.py.
+    Monitor (harmonic-hermes + ultracoder) is handled separately in services/monitor.py.
     """
 
     def __init__(self):

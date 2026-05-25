@@ -45,7 +45,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install sync tooling
-        run: pip install httpx pyyaml packaging
+        run: pip install hf huggingface_hub httpx pyyaml packaging -q
 
       - name: Check PyPI package versions
         run: |

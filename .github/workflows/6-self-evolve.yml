@@ -36,12 +36,12 @@ jobs:
           python-version: "3.12"
 
       - name: Install deps
-        run: pip install httpx anthropic python-dotenv difflib
+        run: pip install hf huggingface_hub httpx anthropic python-dotenv -q
 
       - name: Run self-evolving loop
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ORCHESTRATOR_URL: "https://ollama-gemma4-qwen35-pair-staging.up.railway.app"
+          ORCHESTRATOR_URL: "https://MADdegens-Agent-Q3.hf.space"
         run: |
           python3 - <<'PYEOF'
           import os, httpx, json

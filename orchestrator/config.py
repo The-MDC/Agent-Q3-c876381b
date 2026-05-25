@@ -43,23 +43,20 @@ class Settings(BaseSettings):
     ollama_cloud_device:  str  = "LN-8RDGA90Ultra"
 
     # ── [2] OpenRouter — secondary compute ───────────────────────────────────
-    openrouter_api_key:        str = ""
-    openrouter_api_url:        str = "https://openrouter.ai/api/v1"
-    openrouter_reasoner_model: str = "moonshotai/kimi-k2"
-    openrouter_coder_model:    str = "qwen/qwen3-coder-30b-a3b-instruct"
-    openrouter_tandem_model:   str = "nousresearch/hermes-3-llama-3.1-8b"
-    openrouter_fallback_model: str = "deepseek/deepseek-chat-v3-5"
+    openrouter_api_key:   str = ""
+    openrouter_api_url:   str = "https://openrouter.ai/api/v1"
+    openrouter_model:     str = "moonshotai/kimi-k2.6"
 
     # ── [3] HuggingFace Router — tertiary compute ─────────────────────────────
     hf_token:              str = ""
     hf_token_2:            str = ""
     hf_token_3:            str = ""
     hf_router_url:         str = "https://router.huggingface.co/v1"
-    hf_reasoner_model:     str = "moonshotai/Kimi-K2-Instruct"
+    hf_reasoner_model:     str = "moonshotai/Kimi-K2-Instruct-0905"
     hf_tandem_model:       str = "NousResearch/Hermes-3-Llama-3.1-8B"
-    hf_coder_model:        str = "Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    hf_frontier_reasoner:  str = "moonshotai/Kimi-K2-Instruct"
-    hf_frontier_coder:     str = "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+    hf_coder_model:        str = "Qwen/Qwen3-Coder-480B-A35B-Instruct"
+    hf_frontier_reasoner:  str = "moonshotai/Kimi-K2-Instruct-0905"
+    hf_frontier_coder:     str = "Qwen/Qwen3-Coder-480B-A35B-Instruct"
 
     # ── [4] RunPod Serverless — quaternary GPU burst ──────────────────────────
     runpod_api_key:                str = ""

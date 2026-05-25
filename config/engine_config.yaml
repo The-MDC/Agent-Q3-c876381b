@@ -5,84 +5,96 @@
 # Account: nicholasjmcleod@gmail.com / Device: LN-8RDGA90Ultra
 #
 # Routing chain:
-#   PRIMARY:    Ollama Cloud — 6 cloud sessions hot (zero local storage)
+#   PRIMARY:    Ollama Cloud — 7 cloud sessions hot (nicholasjmcleod/ namespace)
 #   SECONDARY:  OpenRouter — cloud burst / fallback
 #   TERTIARY:   HuggingFace Router — frontier burst
 #   QUATERNARY: RunPod Serverless — GPU scale-out (AMPERE_16, scale-to-zero)
-#   MONITOR:    kimi-k2:1t-cloud — always-on, outside main router
+#   MONITOR:    harmonic-hermes (analysis) + ultracoder (remediation) — Ollama pair
 # =============================================================================
 
 active_engine: "ollama_cloud"
 
-# ── Ollama Cloud (ALL model roles) ───────────────────────────────────────────
-# Requires: device key at /root/.ollama/id_ed25519 (mount host ~/.ollama)
+# ── Ollama Cloud (ALL model roles — nicholasjmcleod/ namespace) ──────────────
+# Source: MADdegens/Models HF bucket → ollama create → ollama push
 # Account: nicholasjmcleod@gmail.com / Device: LN-8RDGA90Ultra
 ollama_cloud:
   account: "nicholasjmcleod@gmail.com"
   device:  "LN-8RDGA90Ultra"
   base_url: "http://ollama:11434"
-  max_sessions: 6
+  max_sessions: 7
   keep_alive: "24h"
   models:
     reasoner:
-      tag:       "kimi-vl:a3b-cloud"
-      role:      "primary instruct / vision / agent / long-ctx"
+      tag:       "nicholasjmcleod/kimi-linear:q6_k"
+      role:      "primary instruct / multimodal vision / agent / long-ctx"
       services:  [multimodal]
       endpoints: [/v1/instruct, /v1/chat]
     tandem:
-      tag:       "hermes3:8b-cloud"
-      role:      "reasoning partner / tandem stage-2 / code review"
-      services:  [multimodal, coder]
-      endpoints: [/v1/tandem-stage2, /v1/coder/review-stage2]
+      tag:       "nicholasjmcleod/harmonic-hermes:q6_k"
+      role:      "reasoning partner / tandem stage-2 / monitor analysis"
+      services:  [multimodal, monitor]
+      endpoints: [/v1/tandem, /v1/monitor/analyze]
     coder:
-      tag:       "qwen3:48b-a4b-cloud"
-      role:      "primary multimodal / tandem implementation / code"
-      services:  [multimodal]
-      endpoints: [/v1/code, /v1/tandem-stage3]
+      tag:       "nicholasjmcleod/ultracoder:q4_k_m"
+      role:      "primary coder / tandem stage-3 / monitor remediation"
+      services:  [multimodal, coder, monitor]
+      endpoints: [/v1/code, /v1/tandem, /v1/monitor/remediate]
     fallback:
-      tag:       "qwopus:27b-cloud"
-      role:      "fallback multimodal when primary overloaded"
+      tag:       "nicholasjmcleod/qwopus:q8_0"
+      role:      "fallback when primary overloaded (Q8_0 full-precision)"
       services:  [multimodal]
       endpoints: [/v1/fallback]
     coder_dedicated:
-      tag:       "qwen3-coder:30b-a3b-cloud"
-      role:      "dedicated code generation (3B active MoE)"
+      tag:       "nicholasjmcleod/qwen3-coder-53b:q6_k"
+      role:      "dedicated long-form code generation (53B TOTAL-RECALL)"
       services:  [coder]
-      endpoints: [/v1/coder, /v1/coder/review-stage1]
-    monitor:
-      tag:       "kimi-k2:1t-cloud"
-      role:      "always-on monitor — outside main router"
-      services:  [monitor]
-      endpoints: [/v1/monitor/analyze]
+      endpoints: [/v1/coder]
+    genstruct:
+      tag:       "nicholasjmcleod/genstruct:q6_k"
+      role:      "structured generation middleware (pre/post all pipelines)"
+      services:  [multimodal, coder, research]
+      endpoints: [/v1/generate]
+    infinity_parser:
+      tag:       "nicholasjmcleod/infinity-parser:latest"
+      role:      "parse/extract/transform middleware (pre/post all pipelines)"
+      services:  [multimodal, coder, research]
+      endpoints: [/v1/parse]
 
-# ── OpenRouter (secondary compute) ───────────────────────────────────────────
+# ── Monitor pair — always-on Harmonic-Hermes + Ultra-Coder ───────────────────
+# Independent from main router — uses local Ollama directly
+monitor_pair:
+  analysis_model:    "nicholasjmcleod/harmonic-hermes:q6_k"
+  remediation_model: "nicholasjmcleod/ultracoder:q4_k_m"
+  poll_interval_secs: 30
+  targets:
+    - name: multimodal
+      url:  "http://multimodal:8000"
+    - name: coder
+      url:  "http://coder:8001"
+    - name: research
+      url:  "http://research:8002"
+    - name: mcp-bridge
+      url:  "http://mcp-bridge:8004"
+    - name: ollama
+      url:  "http://ollama:11434"
+
+# ── OpenRouter (secondary compute — sole model: Kimi-K2.6 multimodal) ────────
+# Single capable multimodal handles all OpenRouter fallback requests
 openrouter:
   base_url: "https://openrouter.ai/api/v1"
-  models:
-    reasoner:         "moonshotai/kimi-k2"
-    tandem:           "nousresearch/hermes-3-llama-3.1-8b"
-    coder:            "qwen/qwen3-coder-30b-a3b-instruct"
-    fallback:         "deepseek/deepseek-chat-v3-5"
-    monitor_fallback: "moonshotai/kimi-k2"
+  model:    "moonshotai/kimi-k2.6"
 
-# ── HuggingFace Router (tertiary compute) ────────────────────────────────────
+# ── HuggingFace Router (tertiary compute — public equivalents of 7-model stack)
 hf_router:
   base_url: "https://router.huggingface.co/v1"
   models:
-    # Deep reasoner — Claude 4.7 Opus distilled MoE (35B/3B active, APEX quant)
-    # 300K+ downloads, VLM-capable, best-in-class CoT on HF Router
-    deep_reasoner:   "mudler/Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-GGUF"
-    # Reasoner fallback — Claude 4.6 Opus distilled (75.7% MMLU-Pro)
-    reasoner:        "hesamation/Qwen3.6-35B-A3B-Claude-4.6-Opus-Reasoning-Distilled-GGUF"
-    # Tandem — 4B reasoning distill, half the VRAM of Hermes3 8B, better CoT
-    tandem:          "khazarai/Qwen3-4B-Qwen3.6-plus-Reasoning-Distilled-GGUF"
-    # Fallback — TeichAI v2 Claude Opus distill (same org as support model)
-    fallback:        "TeichAI/Qwen3.6-27B-Claude-Opus-Reasoning-Distill-v2-GGUF"
-    # Coder — Unsloth upstream imatrix quant (pin-stable)
-    coder:           "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF"
-    coder_dedicated: "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF"
-    # Multimodal reasoner upgrade — Gemma-4 26B MoE (A4B active, 423K DL)
-    reasoner_vl:     "bartowski/google_gemma-4-26B-A4B-it-GGUF"
+    reasoner:         "moonshotai/Kimi-K2-Instruct-0905"
+    tandem:           "NousResearch/Hermes-3-Llama-3.1-8B"
+    coder:            "Qwen/Qwen3-Coder-480B-A35B-Instruct"
+    coder_dedicated:  "Qwen/Qwen3-Coder-480B-A35B-Instruct"
+    fallback:         "Qwen/Qwen3-235B-A22B-Instruct"
+    genstruct:        "NousResearch/Hermes-3-Llama-3.1-8B"
+    infinity_parser:  "mistralai/Mistral-7B-Instruct-v0.3"
   token_rotation:
     - env: HF_TOKEN
     - env: HF_TOKEN_2
@@ -133,7 +145,6 @@ tools:
     mad_gambit: true
   dataset_bucket:
     hf_repo: "madDegen/agent-q3"
-    status:  "parquet_failing"   # TODO: fix dataset generation (500 on viewer)
     contents:
       - "hq/exports/  — Solidity, prediction markets, LangGraph JSONL"
       - "hq/feedback/ — RLHF/DPO feedback signals"
