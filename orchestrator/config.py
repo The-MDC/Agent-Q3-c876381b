@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -95,9 +95,7 @@ class Settings(BaseSettings):
     hf_max_queue:          int = 8
     request_timeout_secs:  int = 300
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # ── Helpers ───────────────────────────────────────────────────────────────
     def active_hf_token(self) -> str:
