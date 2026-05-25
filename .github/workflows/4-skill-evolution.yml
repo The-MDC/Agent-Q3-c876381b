@@ -107,14 +107,15 @@ jobs:
         if: ${{ github.event.inputs.scan_mode == 'all' || github.event.inputs.scan_mode == 'models' || github.event_name == 'schedule' }}
         run: |
           echo "## Ollama Model Updates — Tandem Stack"
-          echo "Tracking: gemma4, qwen3.5, ministral, qwen3"
-          for model in gemma4 qwen3.5 ministral qwen3; do
+          echo "Tracking: hermes3, qwen3, qwopus, qwen3-coder"
+          for model in hermes3 qwen3 qwopus qwen3-coder; do
             echo "- $model: https://ollama.com/library/$model"
           done
           echo ""
           echo "Current deployed:"
-          echo "  - Reasoner: gemma4:e4b-instruct-q4_K_M"
-          echo "  - Coder:    qwen3.5:4b-instruct-q4_K_M"
+          echo "  - Reasoner: moonshotai/Kimi-K2.6 BF16 (HF Router)"
+          echo "  - Tandem:   hermes3:8b-cloud"
+          echo "  - Coder:    qwen3:48b-a4b-cloud"
 
       - name: Check HuggingFace router new model support
         run: |
@@ -150,14 +151,14 @@ jobs:
               '- [ ] Review The-MDC org — new agent frameworks to pull into orchestrator',
               '- [ ] Python SDK bumps — update `requirements.txt` if minor version',
               '- [ ] RunPod balance check — top up if < $5 to keep GPU workers active',
-              '- [ ] New Ollama tags — any Q4_K_M variants better than current?',
+              '- [ ] New Ollama tags — any Q8_0/F16 variants better than current quants?',
               '- [ ] HF router providers — new compute backends worth routing to?',
               '',
-              '## 🧠 Tandem Container — Current State',
+              '## 🧠 Agent-Q3 — Current State',
               '| Service | URL |',
               '|---------|-----|',
-              '| Pair container | `https://ollama-gemma4-qwen35-pair-staging.up.railway.app` |',
-              '| OpenWebUI | `https://open-webui-gateway-staging.up.railway.app` |',
+              '| Orchestrator (HF Space) | `https://maddegen-agent-q3-space.hf.space` |',
+              '| WebUI (HF Space) | `https://maddegen-agent-q3-webui.hf.space` |',
               '| RunPod endpoint | `kukl55t0053lob` |',
               '',
               '## 🛠 Upgrade a tool',
@@ -167,7 +168,7 @@ jobs:
               'cd Agent-Q3',
               '# Edit orchestrator/tools/*.py',
               'git commit -m "tools: update X" && git push',
-              '# → CI auto-builds + redeploys to Railway',
+              '# → CI auto-builds + 5-hf-spaces-deploy.yml redeploys to HF Spaces',
               '```',
               '',
               '## 📦 Add a new pip dependency',

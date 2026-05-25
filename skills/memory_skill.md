@@ -11,19 +11,14 @@ Activate when:
 ## Architecture
 
 ### Short-term (Redis, 24h TTL)
-- Last 100 memory IDs in a Redis list
+- Last 500 memory IDs in a Redis list
 - Fast retrieval for same-session context
 - Endpoint: GET /cowork/memory/recent
 
-### Long-term (Postgres pgvector, permanent)
-- 384-dim embeddings via nomic-embed-text (Ollama local, zero cost)
-- Semantic search: GET /cowork/memory/search?q=<query>&k=5
-- Tags for category filtering
-
-### Episodic (Postgres structured)
-- Key-value store for preferences and corrections
-- Categories: preference, correction, fact, project
-- Survives across all sessions permanently
+### Episodic (Redis tagged records)
+- Memories stored with tags for category filtering
+- Categories: preference, correction, fact, project, canonical
+- Endpoint: GET /cowork/memory/search?q=<query>&k=5
 
 ## MCP tool calls from Claude Cowork
 Save: memory_save { "text": "...", "tags": ["preference"] }

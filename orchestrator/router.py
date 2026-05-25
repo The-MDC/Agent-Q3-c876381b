@@ -1,9 +1,7 @@
 """
 Compute Router — Agent-Q3
-Local GGUF stack: Kimi-VL-A3B (reasoner) + Hermes3-8B (tandem) + Qwen3-48B-Savant (coder)
-                  Qwopus3.6-27B (fallback) + Qwen3-Coder-30B-A3B (coder_dedicated)
-Monitor: kimi-k2:1t-cloud (Ollama Cloud — outside this router)
-Priority chain: Local Ollama → OpenRouter → HuggingFace → RunPod
+Reasoner: moonshotai/Kimi-K2.6 BF16 (HF Router) + cloud model stack via Ollama Cloud
+Priority chain: Local Ollama → OpenRouter → HuggingFace Router → RunPod
 """
 
 import time
@@ -45,12 +43,12 @@ class BackendHealth:
         return time.time() - self.last_check > self.check_interval_secs
 
 
-# Maps model role → local Ollama GGUF model string
-#   reasoner        Kimi-VL-A3B Q4_K_M         — primary instruct / vision / agent
-#   tandem          Hermes3 8B                  — reasoning partner / tandem stage-2
-#   coder           Qwen3-48B-A4B-Savant        — primary multimodal / tandem stage-3
-#   fallback        Qwopus3.6-27B               — fallback multimodal
-#   coder_dedicated Qwen3-Coder-30B-A3B         — dedicated coder service
+# Maps model role → Ollama model string (cloud or local GGUF)
+#   reasoner        moonshotai/Kimi-K2.6 BF16   — primary instruct / vision / agent (HF Router)
+#   tandem          hermes3:8b-cloud             — reasoning partner / tandem stage-2
+#   coder           qwen3:48b-a4b-cloud          — primary multimodal / tandem stage-3
+#   fallback        qwopus:27b-cloud             — fallback multimodal
+#   coder_dedicated qwen3-coder:30b-a3b-cloud    — dedicated coder service
 LOCAL_MODEL_MAP = {
     "reasoner":        lambda: settings.reasoner_model,
     "tandem":          lambda: settings.tandem_model,
@@ -82,9 +80,8 @@ CLOUD_PRIORITY_CHAIN = [Backend.LOCAL, Backend.OPENROUTER, Backend.HF, Backend.R
 class ComputeRouter:
     """
     Routes inference across Local Ollama / OpenRouter / HuggingFace Router / RunPod.
-    Primary: 5-model local GGUF stack (pulled from HuggingFace via Ollama).
+    Primary: Ollama Cloud 5-model stack + Kimi-K2.6 via HF Router.
     Fallback chain (cloud_priority): LOCAL → OPENROUTER → HF → RUNPOD.
-    Monitor (kimi-k2:1t-cloud) is handled separately in services/monitor.py.
     """
 
     def __init__(self):
@@ -294,14 +291,13 @@ class ComputeRouter:
         """
         Select backend → resolve model for role → call with fallback chain.
 
-        Roles → local models:
-          reasoner        → Kimi-VL-A3B Q4_K_M            /v1/instruct /v1/chat
-          tandem          → Hermes3 8B                     /v1/tandem stage-2
-          coder           → Qwen3-48B-A4B-Savant           /v1/code /v1/tandem stage-3
-          fallback        → Qwopus3.6-27B                  /v1/fallback
-          coder_dedicated → Qwen3-Coder-30B-A3B            /v1/coder /v1/coder/review
+        Roles → models:
+          reasoner        → moonshotai/Kimi-K2.6 BF16      /v1/instruct /v1/chat
+          tandem          → hermes3:8b-cloud                /v1/tandem stage-2
+          coder           → qwen3:48b-a4b-cloud             /v1/code /v1/tandem stage-3
+          fallback        → qwopus:27b-cloud                /v1/fallback
+          coder_dedicated → qwen3-coder:30b-a3b-cloud       /v1/coder /v1/coder/review
 
-        Monitor (kimi-k2:1t-cloud) is NOT routed here — see services/monitor.py.
         """
         if model_role not in LOCAL_MODEL_MAP:
             raise ValueError(f"Unknown model_role '{model_role}'. "

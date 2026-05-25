@@ -19,10 +19,9 @@ env:
   EXA_API_KEY: "stub"
   TAVILY_API_KEY: "stub"
   SMITHERY_API_KEY: "stub"
-  DATABASE_URL: "postgresql://stub:stub@localhost:5432/stub"
   REDIS_URL: "redis://stub:6379"
-  PORT: "8000"
-  REASONER_MODEL: "kimi-vl:a3b-cloud"
+  PORT: "7860"
+  REASONER_MODEL: "moonshotai/Kimi-K2.6"
   CODER_MODEL: "qwen3:48b-a4b-cloud"
   COMPUTE_STRATEGY: "cloud_priority"
 

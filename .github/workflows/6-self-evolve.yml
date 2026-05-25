@@ -41,7 +41,7 @@ jobs:
       - name: Run self-evolving loop
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ORCHESTRATOR_URL: "https://ollama-gemma4-qwen35-pair-staging.up.railway.app"
+          ORCHESTRATOR_URL: "https://maddegen-agent-q3-space.hf.space"
         run: |
           python3 - <<'PYEOF'
           import os, httpx, json

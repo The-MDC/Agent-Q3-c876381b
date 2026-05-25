@@ -8,20 +8,20 @@
 
   "model_stack": {
     "reasoner": {
-      "tag": "hf.co/unsloth/Qwen2.5-VL-32B-Instruct-GGUF:Q4_K_M",
-      "format": "Unsloth Dynamic 2.0 / Q4_K_M GGUF",
-      "capabilities": ["multimodal", "deep reasoning", "planning"],
+      "tag": "moonshotai/Kimi-K2.6",
+      "format": "BF16 via HuggingFace Router",
+      "capabilities": ["multimodal", "deep reasoning", "planning", "image-text-to-text"],
       "route": "/v1/reason"
     },
     "support": {
-      "tag": "hf.co/TeichAI/Qwen3-8B-Kimi-K2-Thinking-Distill-GGUF:Q4_K_M",
-      "format": "Unsloth Dynamic 2.0 / Q4_K_M GGUF",
+      "tag": "hf.co/TeichAI/Qwen3-8B-Kimi-K2-Thinking-Distill-GGUF:F16",
+      "format": "F16 GGUF",
       "capabilities": ["hybrid", "thinking", "punches at 16B"],
       "route": "/v1/support"
     },
     "coder": {
-      "tag": "hf.co/unsloth/QwQ-32B-GGUF:Q4_K_M",
-      "format": "Unsloth Dynamic 2.0 / Q4_K_M GGUF",
+      "tag": "hf.co/unsloth/QwQ-32B-GGUF:Q8_0",
+      "format": "Q8_0 GGUF",
       "capabilities": ["deep research", "coding"],
       "context_length": 131072,
       "route": "/v1/code"
@@ -75,7 +75,7 @@
         "description": "Agent Q3 — Triple-model orchestration (Qwen2.5-VL-32B + Qwen3-8B-Kimi + QwQ-32B) with Railway/HuggingFace/RunPod compute routing",
         "visibility": "public",
         "url": "https://github.com/MADdegen/Agent-Q3",
-        "deploy_target": "railway",
+        "deploy_target": "huggingface-spaces",
         "last_pushed": "2026-05-21",
         "open_issues": 2,
         "default_branch": "main"
@@ -263,15 +263,12 @@
       "monitor":     { "port": 8003, "role": "Kimi K2 always-on monitor" },
       "mcp-bridge":  { "port": 8004, "role": "unified MCP gateway" },
       "pipelines":   { "port": 9099, "role": "Open WebUI multi-agent middleware",
-                       "pipelines": ["agent-q3-router", "agent-q3-tandem", "agent-q3-research"],
-                       "railway_secret": "RAILWAY_PIPELINES_SERVICE_ID" },
+                       "pipelines": ["agent-q3-router", "agent-q3-tandem", "agent-q3-research"] },
       "open-webui":  { "port": 3000, "role": "GUI — Ollama Cloud models + agent pipelines" }
     },
-    "staging_urls": {
-      "orchestrator": "https://agent-q3-staging.up.railway.app",
-      "pipelines":    "https://agent-q3-pipelines-staging.up.railway.app",
-      "open_webui":   "https://open-webui-gateway-staging.up.railway.app",
-      "gui":          "https://mad-gambit-gui-staging.up.railway.app"
+    "production_urls": {
+      "orchestrator": "https://maddegen-agent-q3-space.hf.space",
+      "webui":        "https://maddegen-agent-q3-webui.hf.space"
     },
     "compute_cascade": [
       "Ollama Cloud (kimi-vl, hermes3, qwen3-48b, qwopus, qwen3-coder, kimi-k2)",
@@ -280,8 +277,7 @@
       "RunPod (serverless GPU burst)"
     ],
     "memory": {
-      "short_term": "Redis (24h TTL)",
-      "long_term": "Postgres pgvector (384-dim)"
+      "backend": "Redis (24h TTL)"
     },
     "search": ["Perplexity", "Exa", "Tavily", "DuckDuckGo", "Jina", "ArXiv", "SearXNG"],
     "cowork": {

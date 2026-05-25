@@ -23,13 +23,9 @@ on:
         default: "hf_router"
 
 env:
-  RUNPOD_API_KEY:   ${{ secrets.RUNPOD_API_KEY }}
-  HF_TOKEN:         ${{ secrets.HF_TOKEN }}
-  HF_TOKEN_2:       ${{ secrets.HF_TOKEN_2 }}
-  DATABASE_URL:     ${{ secrets.DATABASE_URL }}
-  RAILWAY_TOKEN:    ${{ secrets.RAILWAY_TOKEN }}
-  RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
-  RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+  RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+  HF_TOKEN:       ${{ secrets.HF_TOKEN }}
+  HF_TOKEN_2:     ${{ secrets.HF_TOKEN_2 }}
 
 jobs:
   recompile:
@@ -73,7 +69,7 @@ jobs:
           hf_token  = os.environ.get("HF_TOKEN") or os.environ.get("HF_TOKEN_2","")
           if engine == "hf_router":
               lm = dspy.LM(
-                  model="huggingface/google/gemma-4-e4b-it",
+                  model="huggingface/moonshotai/Kimi-K2.6",
                   api_base="https://router.huggingface.co/v1",
                   api_key=hf_token,
               )
@@ -85,10 +81,6 @@ jobs:
           print("Recompile would run here — full implementation in Phase 6")
           PYEOF
 
-      - name: Trigger Railway redeploy
+      - name: Trigger HF Spaces redeploy
         run: |
-          curl -s -X POST https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"query": "mutation { serviceInstanceDeploy(serviceId: \"${{ secrets.RAILWAY_SERVICE_ID }}\", environmentId: \"${{ secrets.RAILWAY_ENVIRONMENT_ID }}\") }"}' \
-            | python3 -c "import sys,json; r=json.load(sys.stdin); print('Redeploy triggered ✅' if r.get('data') else r)"
+          echo "DSPy recompile complete — push to main to trigger HF Spaces deploy (5-hf-spaces-deploy.yml)"

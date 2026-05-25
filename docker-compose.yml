@@ -10,7 +10,7 @@ version: "3.9"
 #   WebUI        → hf.co/spaces/madDegen/agent-q3-webui
 #
 #  Cloud model → role mapping:
-#    kimi-vl:a3b-cloud           reasoner   /v1/instruct /v1/chat
+#    moonshotai/Kimi-K2.6         reasoner   /v1/instruct /v1/chat (HF Router BF16)
 #    hermes3:8b-cloud            tandem     /v1/tandem stage-2
 #    qwen3:48b-a4b-cloud         coder      /v1/code /v1/tandem stage-3
 #    qwopus:27b-cloud            fallback   /v1/fallback
@@ -39,7 +39,7 @@ x-app-base: &app-base
     COMPUTE_STRATEGY:       "cloud_priority"
     REQUEST_TIMEOUT_SECS:   "300"
     OLLAMA_CLOUD_ENABLED:   "true"
-    REASONER_MODEL:         "kimi-vl:a3b-cloud"
+    REASONER_MODEL:         "moonshotai/Kimi-K2.6"
     TANDEM_MODEL:           "hermes3:8b-cloud"
     CODER_MODEL:            "qwen3:48b-a4b-cloud"
     FALLBACK_MODEL:         "qwopus:27b-cloud"
@@ -199,7 +199,7 @@ services:
       WEBUI_NAME:               "MAD Gambit AI"
       ENABLE_SIGNUP:            "true"
       ENABLE_COMMUNITY_SHARING: "false"
-      DEFAULT_MODELS:           "kimi-vl:a3b-cloud"
+      DEFAULT_MODELS:           "moonshotai/Kimi-K2.6"
     depends_on:
       ollama:
         condition: service_healthy

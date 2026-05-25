@@ -52,7 +52,7 @@ else
 fi
 echo ""
 
-# ── [3/3] Verify all 6 cloud models are reachable ───────────────────────────
+# ── [3/3] Verify all 5 cloud models are reachable ───────────────────────────
 echo "[3/3] Verifying Ollama Cloud model reachability..."
 echo ""
 
@@ -67,24 +67,22 @@ check_cloud_model() {
   fi
 }
 
-check_cloud_model "kimi-vl:a3b-cloud"          "[reasoner]"
 check_cloud_model "hermes3:8b-cloud"            "[tandem]"
 check_cloud_model "qwen3:48b-a4b-cloud"         "[coder]"
 check_cloud_model "qwopus:27b-cloud"            "[fallback]"
 check_cloud_model "qwen3-coder:30b-a3b-cloud"   "[coder_dedicated]"
-check_cloud_model "kimi-k2:1t-cloud"            "[monitor]"
+echo "      [reasoner]: moonshotai/Kimi-K2.6 BF16 via HF Router — no local pull needed"
 
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
-echo "  No local GGUFs — all inference via Ollama Cloud"
+echo "  No local GGUFs — all inference via Ollama Cloud / HF Router"
 echo ""
-echo "  Role → Cloud Model:"
-echo "    reasoner        kimi-vl:a3b-cloud          /v1/instruct /v1/chat"
-echo "    tandem          hermes3:8b-cloud            /v1/tandem stage-2"
-echo "    coder           qwen3:48b-a4b-cloud         /v1/code /v1/tandem stage-3"
-echo "    fallback        qwopus:27b-cloud            /v1/fallback"
-echo "    coder_dedicated qwen3-coder:30b-a3b-cloud   /v1/coder /v1/coder/review"
-echo "    monitor         kimi-k2:1t-cloud            /v1/monitor/analyze"
+echo "  Role → Model:"
+echo "    reasoner        moonshotai/Kimi-K2.6 BF16      /v1/instruct /v1/chat (HF Router)"
+echo "    tandem          hermes3:8b-cloud                /v1/tandem stage-2"
+echo "    coder           qwen3:48b-a4b-cloud             /v1/code /v1/tandem stage-3"
+echo "    fallback        qwopus:27b-cloud                /v1/fallback"
+echo "    coder_dedicated qwen3-coder:30b-a3b-cloud       /v1/coder /v1/coder/review"
 echo ""
 echo "  Ollama API: http://0.0.0.0:11434"
 echo "════════════════════════════════════════════════════════════════════"

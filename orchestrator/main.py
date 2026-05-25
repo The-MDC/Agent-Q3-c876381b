@@ -3,10 +3,10 @@ Agent-Q3 Orchestrator — Main FastAPI App
 MAD Gambit | github.com/MADdegen/Agent-Q3
 
 Model stack:
-  [1] Kimi-VL-A3B-Instruct i1 Q4_K_M  — primary instruct + vision  → /v1/instruct
-  [2] Hermes3 8B                        — tandem reasoning partner   → /v1/tandem (step 1)
-  [3] Qwen3-48B-A4B-Savant Q6_K        — primary multimodal         → /v1/code
-  [4] Qwopus3.6-27B Q8_0               — fallback multimodal        → /v1/fallback
+  [1] moonshotai/Kimi-K2.6 BF16  — primary instruct + vision (HF Router) → /v1/instruct
+  [2] Hermes3 8B cloud           — tandem reasoning partner              → /v1/tandem (step 1)
+  [3] Qwen3-48B-A4B cloud        — primary multimodal                    → /v1/code
+  [4] Qwopus3.6-27B cloud        — fallback multimodal                   → /v1/fallback
 
 Composite endpoints:
   POST /v1/chat     — auto-classify → instruct or multimodal

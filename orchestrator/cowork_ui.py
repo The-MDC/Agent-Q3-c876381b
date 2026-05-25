@@ -59,8 +59,7 @@ CAPABILITIES = {
     "mcp_endpoint": "/cowork/mcp",
     "openai_compat_endpoint": "/cowork/chat",
     "memory": {
-        "short_term": "Redis (24h TTL)",
-        "long_term": "Postgres pgvector (384-dim nomic-embed-text)",
+        "backend": "Redis (24h TTL)",
     },
 }
 
@@ -104,7 +103,7 @@ MCP_TOOLS = [
     },
     {
         "name": "memory_save",
-        "description": "Save a memory to Agent-Q3 persistent memory (Redis + Postgres pgvector).",
+        "description": "Save a memory to Agent-Q3 persistent memory (Redis, 24h TTL).",
         "inputSchema": {
             "type": "object",
             "properties": {

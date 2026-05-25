@@ -1,9 +1,9 @@
 # Agent Q3 — Triple-Model AI Orchestrator
 
-**Reasoner:** `unsloth/Qwen2.5-VL-32B-Instruct-GGUF:Q4_K_M` · multimodal, deep reasoning  
-**Support:** `TeichAI/Qwen3-8B-Kimi-K2-Thinking-Distill-GGUF:Q4_K_M` · hybrid, punches at 16B  
-**Coder:** `unsloth/QwQ-32B-GGUF:Q4_K_M` · 131K ctx, deep research + coding  
-**Compute:** Railway (Ollama GPU volume) → HuggingFace Router → RunPod → OpenRouter
+**Reasoner:** `moonshotai/Kimi-K2.6` · BF16, multimodal image-text-to-text, HF Router  
+**Support:** `TeichAI/Qwen3-8B-Kimi-K2-Thinking-Distill-GGUF:F16` · hybrid, punches at 16B  
+**Coder:** `unsloth/QwQ-32B-GGUF:Q8_0` · 131K ctx, deep research + coding  
+**Compute:** HuggingFace Spaces (Ollama Cloud) → HuggingFace Router → RunPod → OpenRouter
 
 ---
 
@@ -18,7 +18,7 @@ POST /v1/tandem      → Reasoner reasons → Coder implements (chained)
 GET  /health         → backend health + loaded models
 GET  /metrics        → Prometheus
 GET  /cowork/mcp     → Claude Cowork MCP endpoint (8 tools)
-GET  /cowork/memory/ → Memory read/write (Redis 24h + pgvector 384-dim)
+GET  /cowork/memory/ → Memory read/write (Redis 24h TTL)
 ```
 
 ```

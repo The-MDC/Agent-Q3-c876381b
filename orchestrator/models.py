@@ -1,7 +1,7 @@
 """
 Models & task classifier — Agent-Q3
 
-Classifies incoming prompts → routes to Reasoner (kimi-vl:a3b-cloud),
+Classifies incoming prompts → routes to Reasoner (moonshotai/Kimi-K2.6),
 Support (hermes3:8b-cloud), or Coder (qwen3:48b-a4b-cloud).
 """
 
@@ -46,7 +46,7 @@ class HealthResponse(BaseModel):
 
 # ── Task classifier ───────────────────────────────────────────────────────────
 
-# Keywords that strongly indicate CODE / FETCH tasks → Coder (qwen3:48b-a4b-cloud)
+# Keywords that strongly indicate CODE / FETCH tasks → Coder (qwen3:48b-a4b-cloud / QwQ-32B)
 CODER_SIGNALS = re.compile(
     r"\b("
     r"code|function|class|def |import |from .+ import|"
@@ -62,7 +62,7 @@ CODER_SIGNALS = re.compile(
     re.IGNORECASE
 )
 
-# Keywords that strongly indicate REASONING / INSTRUCT tasks → Reasoner (kimi-vl:a3b-cloud)
+# Keywords that strongly indicate REASONING / INSTRUCT tasks → Reasoner (moonshotai/Kimi-K2.6)
 REASONER_SIGNALS = re.compile(
     r"\b("
     r"research|analyze|analyse|explain|compare|evaluate|"
