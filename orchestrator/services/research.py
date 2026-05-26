@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agent-Q3 Deep Research Service",
-    description="Perplexity-grade deep research + quant + scraping, synthesized by Kimi-VL+Hermes+Qwen",
+    description="Perplexity-grade deep research + quant + scraping, synthesized by Kimi-Linear+Harmonic-Hermes+Qwen3-Coder-53B",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -115,7 +115,7 @@ async def root():
             "free_tools": True,
             "polymarket": True,
         },
-        "synthesis_chain": "Kimi-VL → Hermes3 → Qwen3-48B-A4B",
+        "synthesis_chain": "Kimi-Linear → Harmonic-Hermes → Qwen3-Coder-53B TOTAL-RECALL",
     }
 
 
@@ -226,9 +226,9 @@ async def synthesize(req: SynthesizeRequest):
     """
     Full deep-research pipeline:
       1. Gather results from all providers (deep_research)
-      2. Kimi-VL reads everything and extracts key findings
-      3. Hermes3 synthesizes findings into a structured analysis
-      4. Qwen3-48B produces the final report with citations
+      2. Kimi-Linear reads everything and extracts key findings
+      3. Harmonic-Hermes synthesizes findings into a structured analysis
+      4. Qwen3-Coder-53B TOTAL-RECALL produces the final report with citations
     """
     # 1. Gather
     gather = await deep_research(DeepResearchRequest(query=req.query, depth=req.depth))
@@ -243,7 +243,7 @@ async def synthesize(req: SynthesizeRequest):
     if quant_block:
         raw_dump += f"\n\n[Polymarket Conviction]\n{quant_block}"
 
-    # 2. Kimi-VL reads
+    # 2. Kimi-Linear reads
     kimi_msgs = [
         {"role": "system", "content": REASONER_SYSTEM},
         {
@@ -267,9 +267,9 @@ async def synthesize(req: SynthesizeRequest):
             else str(kimi_result.get("message", ""))
         )
     except Exception as e:
-        raise HTTPException(503, detail=f"Kimi-VL findings step failed: {e}")
+        raise HTTPException(503, detail=f"Kimi-Linear findings step failed: {e}")
 
-    # 3. Hermes3 synthesizes
+    # 3. Harmonic-Hermes synthesizes
     hermes_msgs = [
         {"role": "system", "content": HERMES_SYSTEM},
         {
@@ -294,7 +294,7 @@ async def synthesize(req: SynthesizeRequest):
     except Exception as e:
         raise HTTPException(503, detail=f"Hermes synthesis failed: {e}")
 
-    # 4. Qwen3-48B final report
+    # 4. Qwen3-Coder-53B TOTAL-RECALL final report
     final_msgs = [
         {"role": "system", "content": RESEARCH_SYSTEM},
         {
@@ -307,7 +307,7 @@ async def synthesize(req: SynthesizeRequest):
     ]
     try:
         final_result = await router.route(
-            model_role="coder",
+            model_role="coder_dedicated",
             messages=final_msgs,
             temperature=0.3,
             max_tokens=4096,
@@ -328,8 +328,8 @@ async def synthesize(req: SynthesizeRequest):
         "providers_used": list(gather["providers"].keys()),
         "quant": quant_block,
         "pipeline": {
-            "stage1_kimi": kimi_result.get("_model_used"),
-            "stage2_hermes": hermes_result.get("_model_used"),
-            "stage3_qwen": final_result.get("_model_used"),
+            "stage1_kimi_linear": kimi_result.get("_model_used"),
+            "stage2_harmonic_hermes": hermes_result.get("_model_used"),
+            "stage3_qwen3_coder": final_result.get("_model_used"),
         },
     }

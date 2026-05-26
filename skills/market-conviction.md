@@ -15,7 +15,7 @@ When the user asks about prediction markets, position sizing, or event probabili
    - **Edge** = your probability estimate − implied probability
    - Negative edge = no position. Positive edge = size proportional to edge magnitude.
 
-3. Cross-reference with Kimi K2 monitor analysis (`POST http://monitor:8003/v1/monitor/analyze`) for any macro signals affecting the market.
+3. Cross-reference with Harmonic-Hermes monitor analysis (`POST http://monitor:8003/v1/monitor/analyze`) for any macro signals affecting the market.
 
 4. Report format:
    - Market name + current odds

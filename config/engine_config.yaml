@@ -5,28 +5,29 @@
 # Account: nicholasjmcleod@gmail.com / Device: LN-8RDGA90Ultra
 #
 # Routing chain:
-#   PRIMARY:    Ollama Cloud — 7 cloud sessions hot (nicholasjmcleod/ namespace)
-#   SECONDARY:  OpenRouter — cloud burst / fallback
-#   TERTIARY:   HuggingFace Router — frontier burst
-#   QUATERNARY: RunPod Serverless — GPU scale-out (AMPERE_16, scale-to-zero)
-#   MONITOR:    harmonic-hermes (analysis) + ultracoder (remediation) — Ollama pair
+#   PRIMARY:    Ollama Cloud — 6 cloud sessions hot (nicholasjmcleod/ namespace)
+#   SECONDARY:  Moonshot API — free-credit Kimi K2.6 primary orchestrator
+#   TERTIARY:   OpenRouter — K2.6 fallback ($0.73/1M in, $3.49/1M out)
+#   QUATERNARY: HuggingFace Router — frontier burst
+#   QUINARY:    RunPod Serverless — GPU scale-out (AMPERE_16, scale-to-zero)
+#   MONITOR:    harmonic-hermes (analysis) + qwen3-coder-53b (remediation)
 # =============================================================================
 
 active_engine: "ollama_cloud"
 
-# ── Ollama Cloud (ALL model roles — nicholasjmcleod/ namespace) ──────────────
+# ── Ollama Cloud (all local model roles — nicholasjmcleod/ namespace) ─────────
 # Source: MADdegens/Models HF bucket → ollama create → ollama push
 # Account: nicholasjmcleod@gmail.com / Device: LN-8RDGA90Ultra
 ollama_cloud:
   account: "nicholasjmcleod@gmail.com"
   device:  "LN-8RDGA90Ultra"
   base_url: "http://ollama:11434"
-  max_sessions: 7
+  max_sessions: 6
   keep_alive: "24h"
   models:
     reasoner:
       tag:       "nicholasjmcleod/kimi-linear:q6_k"
-      role:      "primary instruct / multimodal vision / agent / long-ctx"
+      role:      "1M-ctx ultra-long-context preprocessor / multimodal / instruct"
       services:  [multimodal]
       endpoints: [/v1/instruct, /v1/chat]
     tandem:
@@ -34,21 +35,16 @@ ollama_cloud:
       role:      "reasoning partner / tandem stage-2 / monitor analysis"
       services:  [multimodal, monitor]
       endpoints: [/v1/tandem, /v1/monitor/analyze]
-    coder:
-      tag:       "nicholasjmcleod/ultracoder:q4_k_m"
-      role:      "primary coder / tandem stage-3 / monitor remediation"
-      services:  [multimodal, coder, monitor]
-      endpoints: [/v1/code, /v1/tandem, /v1/monitor/remediate]
-    fallback:
-      tag:       "nicholasjmcleod/qwopus:q8_0"
-      role:      "fallback when primary overloaded (Q8_0 full-precision)"
-      services:  [multimodal]
-      endpoints: [/v1/fallback]
     coder_dedicated:
       tag:       "nicholasjmcleod/qwen3-coder-53b:q6_k"
-      role:      "dedicated long-form code generation (53B TOTAL-RECALL)"
-      services:  [coder]
-      endpoints: [/v1/coder]
+      role:      "primary + dedicated code generation (53B TOTAL-RECALL / 3B active MoE)"
+      services:  [multimodal, coder, monitor]
+      endpoints: [/v1/code, /v1/coder, /v1/tandem, /v1/monitor/remediate]
+    kimi_distilled:
+      tag:       "nicholasjmcleod/kimi-distilled:iq4_xs"
+      role:      "structured K2.6-style reasoning (35B MoE / 3B active, always-on <think>)"
+      services:  [multimodal, research]
+      endpoints: [/v1/reason]
     genstruct:
       tag:       "nicholasjmcleod/genstruct:q6_k"
       role:      "structured generation middleware (pre/post all pipelines)"
@@ -60,11 +56,11 @@ ollama_cloud:
       services:  [multimodal, coder, research]
       endpoints: [/v1/parse]
 
-# ── Monitor pair — always-on Harmonic-Hermes + Ultra-Coder ───────────────────
+# ── Monitor pair — always-on Harmonic-Hermes + Qwen3-Coder-53B ───────────────
 # Independent from main router — uses local Ollama directly
 monitor_pair:
   analysis_model:    "nicholasjmcleod/harmonic-hermes:q6_k"
-  remediation_model: "nicholasjmcleod/ultracoder:q4_k_m"
+  remediation_model: "nicholasjmcleod/qwen3-coder-53b:q6_k"
   poll_interval_secs: 30
   targets:
     - name: multimodal
@@ -78,21 +74,27 @@ monitor_pair:
     - name: ollama
       url:  "http://ollama:11434"
 
-# ── OpenRouter (secondary compute — sole model: Kimi-K2.6 multimodal) ────────
-# Single capable multimodal handles all OpenRouter fallback requests
+# ── Moonshot API (secondary — Kimi K2.6 primary orchestrator, free credits) ───
+# OpenAI-compatible. Free credits for new accounts at platform.moonshot.ai
+# preserve_thinking: true → exposes <think>...</think> in multi-turn
+moonshot:
+  base_url:          "https://api.moonshot.ai/v1"
+  model:             "kimi-k2-0711-preview"
+  preserve_thinking: true
+  context_length:    131072
+
+# ── OpenRouter (tertiary — K2.6 fallback, $0.73/1M in / $3.49/1M out) ────────
 openrouter:
   base_url: "https://openrouter.ai/api/v1"
   model:    "moonshotai/kimi-k2.6"
 
-# ── HuggingFace Router (tertiary compute — public equivalents of 7-model stack)
+# ── HuggingFace Router (quaternary — public equivalents of model stack) ────────
 hf_router:
   base_url: "https://router.huggingface.co/v1"
   models:
     reasoner:         "moonshotai/Kimi-K2-Instruct-0905"
     tandem:           "NousResearch/Hermes-3-Llama-3.1-8B"
-    coder:            "Qwen/Qwen3-Coder-480B-A35B-Instruct"
     coder_dedicated:  "Qwen/Qwen3-Coder-480B-A35B-Instruct"
-    fallback:         "Qwen/Qwen3-235B-A22B-Instruct"
     genstruct:        "NousResearch/Hermes-3-Llama-3.1-8B"
     infinity_parser:  "mistralai/Mistral-7B-Instruct-v0.3"
   token_rotation:
@@ -100,7 +102,7 @@ hf_router:
     - env: HF_TOKEN_2
     - env: HF_TOKEN_3
 
-# ── RunPod Serverless (quaternary — GPU burst) ────────────────────────────────
+# ── RunPod Serverless (quinary — GPU burst) ───────────────────────────────────
 runpod:
   api_url: "https://api.runpod.ai/v2"
   endpoints:
@@ -117,14 +119,15 @@ runpod:
   tensorrt_approved: false
   fallback_to_vllm:  true
 
-# ── Routing (cloud_priority: Ollama Cloud → OpenRouter → HF → RunPod) ────────
+# ── Routing (cloud_priority: Ollama Cloud → Moonshot → OpenRouter → HF → RunPod)
 routing:
   strategy: "cloud_priority"
   weights:
-    local:      60
-    openrouter: 20
-    hf_router:  15
-    runpod:     5
+    local:      55
+    moonshot:   25
+    openrouter: 10
+    hf_router:  8
+    runpod:     2
 
 # ── MCP servers (.mcp.json is the authoritative registry) ────────────────────
 # Active HTTP servers (bridge connects on boot):

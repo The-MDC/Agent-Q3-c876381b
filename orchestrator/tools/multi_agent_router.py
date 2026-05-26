@@ -1,6 +1,6 @@
 """Multi-agent orchestration for Agent-Q3.
 
-Kimi (Support model) can spawn sub-agents (Reasoner, Coder) for complex tasks.
+Harmonic-Hermes (tandem) synthesizes results from Reasoner + Coder sub-agents.
 """
 
 from __future__ import annotations
@@ -23,11 +23,11 @@ class MultiAgentRouter:
         self.models = {
             "reasoner": settings.reasoner_model,
             "coder": settings.coder_model,
-            "support": settings.support_model,
+            "tandem": settings.tandem_model,
         }
 
     async def should_spawn_agents(self, task: str, context: dict) -> bool:
-        """Determine if Kimi should spawn sub-agents."""
+        """Determine if the orchestrator should spawn sub-agents."""
         complexity_indicators = [
             "research",
             "analyze",
@@ -44,7 +44,7 @@ class MultiAgentRouter:
         return any(indicator in task_lower for indicator in complexity_indicators)
 
     async def spawn_reasoner(self, task: str) -> dict:
-        """Spawn Reasoner agent for deep analysis."""
+        """Spawn Reasoner agent (Kimi-Linear) for deep analysis."""
         try:
             result = await self.compute.route(
                 model_role="reasoner",
@@ -65,7 +65,7 @@ class MultiAgentRouter:
             }
 
     async def spawn_coder(self, task: str) -> dict:
-        """Spawn Coder agent for implementation."""
+        """Spawn Coder agent (Qwen3-Coder-53B) for implementation."""
         try:
             result = await self.compute.route(
                 model_role="coder",
@@ -87,9 +87,10 @@ class MultiAgentRouter:
 
     async def spawn_agents(self, task: str) -> dict:
         """Spawn Reasoner + Coder in parallel."""
-        reasoner_task = self.spawn_reasoner(task)
-        coder_task = self.spawn_coder(task)
-        reasoner_result, coder_result = await asyncio.gather(reasoner_task, coder_task)
+        reasoner_result, coder_result = await asyncio.gather(
+            self.spawn_reasoner(task),
+            self.spawn_coder(task),
+        )
         return {
             "spawned_agents": ["reasoner", "coder"],
             "results": {
@@ -106,8 +107,8 @@ class MultiAgentRouter:
     ) -> dict:
         """Route request through multi-agent orchestration.
 
-        If Kimi detects a complex task, spawn Reasoner + Coder.
-        Otherwise, use Kimi (Support) alone.
+        If the task is complex, spawn Reasoner + Coder then synthesize with Harmonic-Hermes.
+        Otherwise use Harmonic-Hermes alone.
         """
         context = context or {}
 
@@ -117,22 +118,22 @@ class MultiAgentRouter:
             logger.info("spawning sub-agents", query=query[:100])
             agent_results = await self.spawn_agents(query)
 
-            synthesis_prompt = f"""
-You are Kimi, a hybrid reasoning model. Two agents have analyzed this task:
+            synthesis_prompt = f"""You are Harmonic-Hermes, the synthesis model in the Agent-Q3 pipeline.
+Two agents have analyzed this task:
 
 TASK: {query}
 
-REASONER ANALYSIS:
+REASONER ANALYSIS (Kimi-Linear):
 {agent_results["results"]["reasoner"].get("response", "No response")}
 
-CODER ANALYSIS:
+CODER ANALYSIS (Qwen3-Coder-53B):
 {agent_results["results"]["coder"].get("response", "No response")}
 
 Synthesize these analyses into a coherent, actionable response.
 """
             try:
                 synthesis = await self.compute.route(
-                    model_role="support",
+                    model_role="tandem",
                     messages=[{"role": "user", "content": synthesis_prompt}],
                     max_tokens=2048,
                 )
@@ -151,22 +152,22 @@ Synthesize these analyses into a coherent, actionable response.
                     "error": str(e),
                 }
         else:
-            logger.info("single agent mode", query=query[:100])
+            logger.info("single agent mode (tandem)", query=query[:100])
             try:
                 result = await self.compute.route(
-                    model_role="support",
+                    model_role="tandem",
                     messages=[{"role": "user", "content": query}],
                     max_tokens=2048,
                 )
                 return {
                     "multi_agent": False,
-                    "agent": "support",
+                    "agent": "tandem",
                     "response": result.get("message", {}).get("content", ""),
                 }
             except Exception as e:
-                logger.error("support agent failed", error=str(e))
+                logger.error("tandem agent failed", error=str(e))
                 return {
                     "multi_agent": False,
-                    "agent": "support",
+                    "agent": "tandem",
                     "error": str(e),
                 }

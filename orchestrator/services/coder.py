@@ -1,11 +1,11 @@
 """
 Agent-Q3 — Dedicated Coder Service
-Qwen3-Coder-30B-A3B-Instruct  (3B active MoE, ~96%+ HumanEval)
-Supported by Hermes3 for code review / second-opinion
+Qwen3-Coder-53B TOTAL-RECALL (3B active MoE, ~96%+ HumanEval)
+Supported by Harmonic-Hermes for code review / second-opinion
 
 Endpoints:
-  POST /v1/coder         — single-pass code generation (Qwen3-Coder)
-  POST /v1/coder/review  — Qwen3-Coder writes → Hermes3 reviews → final
+  POST /v1/coder         — single-pass code generation (Qwen3-Coder-53B TOTAL-RECALL)
+  POST /v1/coder/review  — Qwen3-Coder-53B writes → Harmonic-Hermes reviews → final
   GET  /health
 """
 
@@ -30,7 +30,7 @@ log = structlog.get_logger(__name__)
 LOCAL_MODEL_MAP["coder_dedicated"] = lambda: settings.coder_dedicated_model
 HF_MODEL_MAP["coder_dedicated"] = lambda: settings.hf_coder_model
 
-CODER_DEDICATED_SYSTEM = """You are a senior software engineer using Qwen3-Coder.
+CODER_DEDICATED_SYSTEM = """You are a senior software engineer using Qwen3-Coder-53B TOTAL-RECALL.
 Write correct, idiomatic, production-grade code.
 
 - Read the requirements precisely. Ask only if blocking ambiguity exists.
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agent-Q3 Coder Service",
-    description="Dedicated Qwen3-Coder-30B-A3B endpoint with Hermes3 review tandem",
+    description="Dedicated Qwen3-Coder-53B TOTAL-RECALL endpoint with Harmonic-Hermes review tandem",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -109,7 +109,7 @@ async def health():
 
 @app.post("/v1/coder", response_model=ChatResponse)
 async def coder(request: ChatRequest):
-    """Single-pass Qwen3-Coder-30B-A3B code generation."""
+    """Single-pass Qwen3-Coder-53B TOTAL-RECALL code generation."""
     messages = _build_messages(request, CODER_DEDICATED_SYSTEM)
     force_backend = Backend(request.force_backend) if request.force_backend else None
     try:
@@ -135,10 +135,10 @@ async def coder(request: ChatRequest):
 async def coder_review(request: ChatRequest):
     """
     Two-stage code generation:
-      Stage 1 — Qwen3-Coder writes the code
-      Stage 2 — Hermes3 reviews it (correctness, edge cases, style)
+      Stage 1 — Qwen3-Coder-53B TOTAL-RECALL writes the code
+      Stage 2 — Harmonic-Hermes reviews it (correctness, edge cases, style)
     """
-    # Stage 1: Qwen3-Coder
+    # Stage 1: Qwen3-Coder-53B TOTAL-RECALL
     write_msgs = _build_messages(request, CODER_DEDICATED_SYSTEM)
     try:
         write_result = await router.route(
@@ -149,13 +149,13 @@ async def coder_review(request: ChatRequest):
         )
         code_out = _extract(write_result)
     except Exception as e:
-        raise HTTPException(503, detail=f"Qwen3-Coder failed: {e}")
+        raise HTTPException(503, detail=f"Qwen3-Coder-53B failed: {e}")
 
-    # Stage 2: Hermes3 reviews
+    # Stage 2: Harmonic-Hermes reviews
     review_msgs = [
         {"role": "system", "content": HERMES_SYSTEM},
         *[m.model_dump() for m in request.messages],
-        {"role": "assistant", "content": f"[Qwen3-Coder draft]\n{code_out}"},
+        {"role": "assistant", "content": f"[Qwen3-Coder-53B draft]\n{code_out}"},
         {
             "role": "user",
             "content": "Review the code above. Identify bugs, edge cases, security issues, "

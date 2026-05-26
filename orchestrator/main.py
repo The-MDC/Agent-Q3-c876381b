@@ -52,6 +52,13 @@ from .models import (
 from .plugins import plugins
 from .router import Backend, router
 from .skills import skills
+from .services.capacity import (
+    capacity_status,
+    record_request_end,
+    record_request_start,
+    should_spawn_subagent,
+)
+from .tools.multi_agent_router import MultiAgentRouter
 
 log = structlog.get_logger(__name__)
 
@@ -98,6 +105,9 @@ app.add_middleware(
 )
 
 Instrumentator().instrument(app).expose(app)
+
+# Multi-agent router triggered when a model role exceeds capacity thresholds
+multi_agent = MultiAgentRouter(compute_router=router)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

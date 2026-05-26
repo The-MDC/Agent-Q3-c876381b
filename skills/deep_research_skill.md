@@ -7,10 +7,10 @@ Activate when user needs: research, investigation, deep dive, current events, ac
 
 ### Tier 1 — Free (always runs first)
 1. free_search.py — DuckDuckGo + Jina + ArXiv + Wikipedia + GitHub
-2. searxng — Railway internal meta-search (70+ engines, zero cost)
+2. searxng — self-hosted meta-search (70+ engines, zero cost)
 
 ### Tier 2 — Paid APIs (if Tier 1 insufficient)
-3. web_search.py — Exa -> Tavily -> Brave (auto-fallback)
+3. web_search.py — Exa → Tavily → Brave (auto-fallback)
 4. perplexity_search.py — sonar / sonar-pro
 
 ### Tier 3 — Deep research (comprehensive multi-step)
@@ -20,9 +20,11 @@ Activate when user needs: research, investigation, deep dive, current events, ac
 deep_research { "query": "...", "model": "sonar-deep-research" }
 
 ## Model routing
-- Short factual -> Qwen3-8B-Kimi (fast)
-- Multi-step analysis -> QwQ-32B (131K ctx)
-- Vision/multimodal -> Qwen2.5-VL-32B
+- Short factual → Harmonic-Hermes (fast, 9B)
+- Multi-step analysis → Kimi-Linear (1M ctx, ultra-long document grounding)
+- Structured reasoning → Kimi-Distilled (IQ4_XS, always-on <think>)
+- Vision/multimodal → Kimi-Linear (pass images[] in message content)
+- Final synthesis → Qwen3-Coder-53B TOTAL-RECALL
 
 ## Output format
 1. Summary (3-5 sentences)

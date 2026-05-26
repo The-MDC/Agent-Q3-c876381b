@@ -7,8 +7,8 @@ roles: [coder, coder_dedicated]
 For any non-trivial code task:
 
 1. Use the dedicated coder service (`http://coder:8001/v1/coder/review`) which automatically runs the two-stage flow:
-   - Stage 1: Qwen3-Coder-30B-A3B writes the code
-   - Stage 2: Hermes3 reviews for bugs, edge cases, security, idioms
+   - Stage 1: Qwen3-Coder-53B TOTAL-RECALL writes the code
+   - Stage 2: Harmonic-Hermes reviews for bugs, edge cases, security, idioms
 2. Return both the draft AND the review.
 3. If the review flags issues, output the corrected version.
 4. Never add comments that explain WHAT the code does — only WHY for non-obvious decisions.
