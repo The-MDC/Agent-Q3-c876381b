@@ -120,12 +120,20 @@ runpod:
   fallback_to_vllm:  true
 
 # ── Routing (cloud_priority: Ollama Cloud → Moonshot → OpenRouter → HF → RunPod)
+# Weights calibrated to actual verified subscription capacity (May 2026):
+#   Ollama Cloud Pro  ($20/mo):  3 concurrent sessions, ~$0.67/day GPU time
+#   Moonshot Tier 0   (free):    1.5M tok/day FREE = ~750 K2.6 req/day; swarm backbone
+#   Moonshot Tier 1   ($10 rc):  50 concurrent / 200 RPM after first recharge
+#   OpenRouter        (PAYG):    no platform limits; big coding Qwen3-480B + K2.6 overflow
+#   HF Router         ($49/mo):  $2 madDegen Pro + ~$4-6 MADdegens Teams = ~$8/mo
+#                                 50 ZeroGPU Spaces (Teams) — A100 for Space containers
+#   RunPod Community  ($25 dep): ~73 hrs RTX 4090 total @ $0.34/hr, scale-to-zero
 routing:
   strategy: "cloud_priority"
   weights:
-    local:      55
-    moonshot:   25
-    openrouter: 10
+    local:      38
+    moonshot:   37
+    openrouter: 15
     hf_router:  8
     runpod:     2
 

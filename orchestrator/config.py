@@ -95,9 +95,17 @@ class Settings(BaseSettings):
         "openrouter_first",
     ] = "cloud_priority"
 
-    local_weight:      int = 55
-    moonshot_weight:   int = 25
-    openrouter_weight: int = 10
+    # Weights calibrated to actual subscription capacity (May 2026):
+    #   Ollama Cloud Pro  ($20/mo): 3 concurrent sessions, ~$0.67/day GPU time
+    #   Moonshot Tier 0   (free):   1.5M tokens/day FREE = ~750 K2.6 calls/day
+    #   Moonshot Tier 1   ($10 rc): 50 concurrent / 200 RPM after recharge
+    #   OpenRouter        (PAYG):   no platform limits; big coding + overflow
+    #   HF Router         ($49/mo): $2 Personal + ~$4-6 Teams = ~$8/mo credits
+    #                               + 50 ZeroGPU Spaces (Teams org)
+    #   RunPod Community  ($25 dep):~73 hrs RTX 4090 total, scale-to-zero
+    local_weight:      int = 38
+    moonshot_weight:   int = 37
+    openrouter_weight: int = 15
     hf_weight:         int = 8
     runpod_weight:     int = 2
 
