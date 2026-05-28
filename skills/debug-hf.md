@@ -18,7 +18,7 @@ curl -N -H "Authorization: Bearer $HF_TOKEN" \
 curl -N -H "Authorization: Bearer $HF_TOKEN" \
   "https://huggingface.co/api/spaces/MADdegens/Agent-Q3/logs/build"
 ```
-Spaces: `MADdegens/Agent-Q3` · `MADdegens/agent-q3-compiler` · `madDegen/job-automation-agent`
+Spaces in scope: `MADdegens/Agent-Q3` · `MADdegens/agent-q3-compiler`
 
 ## Space stages
 | Stage | Meaning | Action |
