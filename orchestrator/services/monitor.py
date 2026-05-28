@@ -192,13 +192,15 @@ async def _poll_loop():
                 state.reading(name).append(record)
 
                 if prev_status and prev_status != record["status"]:
-                    await state.emit({
-                        "kind": "transition",
-                        "service": name,
-                        "from": prev_status,
-                        "to": record["status"],
-                        "latency_ms": record["latency_ms"],
-                    })
+                    await state.emit(
+                        {
+                            "kind": "transition",
+                            "service": name,
+                            "from": prev_status,
+                            "to": record["status"],
+                            "latency_ms": record["latency_ms"],
+                        }
+                    )
                     # On down/degraded → trigger Hermes analysis (rate-limited 5min/svc)
                     if record["status"] != "up":
                         last = state.last_analysis_ts.get(name, 0)
@@ -206,11 +208,13 @@ async def _poll_loop():
                             state.last_analysis_ts[name] = time.time()
                             asyncio.create_task(_anomaly_analysis(name, record))
                 elif record["latency_ms"] and record["latency_ms"] > 10000:
-                    await state.emit({
-                        "kind": "slow_response",
-                        "service": name,
-                        "latency_ms": record["latency_ms"],
-                    })
+                    await state.emit(
+                        {
+                            "kind": "slow_response",
+                            "service": name,
+                            "latency_ms": record["latency_ms"],
+                        }
+                    )
         except Exception as e:
             log.error("poll loop iteration failed", error=str(e))
 
@@ -261,15 +265,17 @@ async def _anomaly_analysis(service: str, record: dict) -> None:
         )
         remediation = coder_resp["content"]
 
-        await state.emit({
-            "kind": "monitor_insight",
-            "service": service,
-            "trigger": "anomaly",
-            "analysis": analysis,
-            "remediation": remediation,
-            "analysis_model": settings.monitor_model,
-            "remediation_model": settings.monitor_coder_model,
-        })
+        await state.emit(
+            {
+                "kind": "monitor_insight",
+                "service": service,
+                "trigger": "anomaly",
+                "analysis": analysis,
+                "remediation": remediation,
+                "analysis_model": settings.monitor_model,
+                "remediation_model": settings.monitor_coder_model,
+            }
+        )
     except Exception as e:
         log.warning("anomaly analysis failed", error=str(e))
 
@@ -396,12 +402,14 @@ async def analyze(req: AnalyzeRequest):
     except Exception as e:
         raise HTTPException(503, detail=f"Harmonic-Hermes call failed: {e}")
 
-    await state.emit({
-        "kind": "monitor_insight",
-        "trigger": "user_query",
-        "query": req.query[:200],
-        "analysis": resp["content"][:200],
-    })
+    await state.emit(
+        {
+            "kind": "monitor_insight",
+            "trigger": "user_query",
+            "query": req.query[:200],
+            "analysis": resp["content"][:200],
+        }
+    )
     return {
         "model": settings.monitor_model,
         "analysis": resp["content"],
@@ -441,11 +449,13 @@ async def ws_live(ws: WebSocket):
     q: asyncio.Queue = asyncio.Queue(maxsize=64)
     state.subscribers.add(q)
     try:
-        await ws.send_json({
-            "kind": "hello",
-            "tracked": list(state.metrics.keys()),
-            "uptime_secs": round(time.time() - state.started_at, 1),
-        })
+        await ws.send_json(
+            {
+                "kind": "hello",
+                "tracked": list(state.metrics.keys()),
+                "uptime_secs": round(time.time() - state.started_at, 1),
+            }
+        )
         while True:
             event = await q.get()
             await ws.send_json(event)

@@ -52,12 +52,6 @@ from .models import (
 from .plugins import plugins
 from .router import Backend, router
 from .skills import skills
-from .services.capacity import (
-    capacity_status,
-    record_request_end,
-    record_request_start,
-    should_spawn_subagent,
-)
 from .tools.multi_agent_router import MultiAgentRouter
 
 log = structlog.get_logger(__name__)
@@ -444,7 +438,10 @@ async def tandem(request: ChatRequest):
         {"role": "system", "content": HERMES_SYSTEM},
         *[m.model_dump(exclude_none=True) for m in request.messages],
         {"role": "assistant", "content": f"[Kimi-Linear Analysis]\n{kimi_analysis}"},
-        {"role": "user", "content": "Reason through this carefully. Identify gaps and produce a precise, refined implementation plan."},
+        {
+            "role": "user",
+            "content": "Reason through this carefully. Identify gaps and produce a precise, refined implementation plan.",
+        },
     ]
     try:
         hermes_result = await router.route(

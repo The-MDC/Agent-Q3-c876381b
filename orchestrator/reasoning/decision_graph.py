@@ -70,9 +70,18 @@ class DecisionGraph:
         """Analyze query complexity."""
         query = state["query"]
         complexity_indicators = [
-            "research", "analyze", "investigate", "compare",
-            "implement", "debug", "refactor", "optimize",
-            "design", "architecture", "complex", "difficult",
+            "research",
+            "analyze",
+            "investigate",
+            "compare",
+            "implement",
+            "debug",
+            "refactor",
+            "optimize",
+            "design",
+            "architecture",
+            "complex",
+            "difficult",
         ]
         should_spawn = any(ind in query.lower() for ind in complexity_indicators)
         state["should_spawn"] = should_spawn

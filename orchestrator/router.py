@@ -47,23 +47,23 @@ class BackendHealth:
 
 
 LOCAL_MODEL_MAP = {
-    "reasoner":         lambda: settings.reasoner_model,
-    "tandem":           lambda: settings.tandem_model,
-    "coder":            lambda: settings.coder_model,
-    "fallback":         lambda: settings.fallback_model,
-    "coder_dedicated":  lambda: settings.coder_dedicated_model,
-    "genstruct":        lambda: settings.genstruct_model,
-    "infinity_parser":  lambda: settings.infinity_parser_model,
+    "reasoner": lambda: settings.reasoner_model,
+    "tandem": lambda: settings.tandem_model,
+    "coder": lambda: settings.coder_model,
+    "fallback": lambda: settings.fallback_model,
+    "coder_dedicated": lambda: settings.coder_dedicated_model,
+    "genstruct": lambda: settings.genstruct_model,
+    "infinity_parser": lambda: settings.infinity_parser_model,
 }
 
 HF_MODEL_MAP = {
-    "reasoner":         lambda: settings.hf_reasoner_model,
-    "tandem":           lambda: settings.hf_tandem_model,
-    "coder":            lambda: settings.hf_coder_model,
-    "fallback":         lambda: settings.hf_coder_model,
-    "coder_dedicated":  lambda: settings.hf_frontier_coder,
-    "genstruct":        lambda: settings.hf_tandem_model,
-    "infinity_parser":  lambda: settings.hf_tandem_model,
+    "reasoner": lambda: settings.hf_reasoner_model,
+    "tandem": lambda: settings.hf_tandem_model,
+    "coder": lambda: settings.hf_coder_model,
+    "fallback": lambda: settings.hf_coder_model,
+    "coder_dedicated": lambda: settings.hf_frontier_coder,
+    "genstruct": lambda: settings.hf_tandem_model,
+    "infinity_parser": lambda: settings.hf_tandem_model,
 }
 
 # OpenRouter uses a single capable multimodal model for all roles
