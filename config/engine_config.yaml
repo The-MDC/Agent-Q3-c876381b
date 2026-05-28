@@ -154,9 +154,4 @@ tools:
   prediction_markets:
     polymarket: true
     mad_gambit: true
-  dataset_bucket:
-    hf_repo: "madDegen/agent-q3"
-    contents:
-      - "hq/exports/  — Solidity, prediction markets, LangGraph JSONL"
-      - "hq/feedback/ — RLHF/DPO feedback signals"
-      - "hq/chroma/   — ChromaDB vectors"
+
