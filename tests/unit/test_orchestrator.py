@@ -37,24 +37,25 @@ class TestSettings:
     def test_defaults(self):
         s = Settings()
         assert s.reasoner_model == "nicholasjmcleod/kimi-linear:q6_k"
-        assert s.coder_model == "nicholasjmcleod/ultracoder:q4_k_m"
+        assert s.coder_model == "nicholasjmcleod/qwen3-coder-53b:q6_k"
         assert s.tandem_model == "nicholasjmcleod/harmonic-hermes:q6_k"
-        assert s.fallback_model == "nicholasjmcleod/qwopus:q8_0"
         assert s.coder_dedicated_model == "nicholasjmcleod/qwen3-coder-53b:q6_k"
+        assert s.kimi_distilled_model == "nicholasjmcleod/kimi-distilled:iq4_xs"
         assert s.genstruct_model == "nicholasjmcleod/genstruct:q6_k"
         assert s.infinity_parser_model == "nicholasjmcleod/infinity-parser:latest"
         assert s.monitor_model == "nicholasjmcleod/harmonic-hermes:q6_k"
-        assert s.monitor_coder_model == "nicholasjmcleod/ultracoder:q4_k_m"
+        assert s.monitor_coder_model == "nicholasjmcleod/qwen3-coder-53b:q6_k"
         assert s.openrouter_model == "moonshotai/kimi-k2.6"
-        assert s.local_weight == 60
-        assert s.openrouter_weight == 20
-        assert s.hf_weight == 15
-        assert s.runpod_weight == 5
+        assert s.local_weight == 38
+        assert s.moonshot_weight == 37
+        assert s.openrouter_weight == 15
+        assert s.hf_weight == 8
+        assert s.runpod_weight == 2
         assert s.compute_strategy == "cloud_priority"
 
     def test_weights_sum_to_100(self):
         s = Settings()
-        assert s.local_weight + s.openrouter_weight + s.hf_weight + s.runpod_weight == 100
+        assert s.local_weight + s.moonshot_weight + s.openrouter_weight + s.hf_weight + s.runpod_weight == 100
 
 
 class TestChatRequest:
@@ -70,10 +71,11 @@ class TestChatRequest:
         req = ChatRequest(messages=[msg("implement a prediction market contract")], model_role="auto", max_tokens=4096)
         assert req.max_tokens == 4096
 
-    def test_multimodal_images_field(self):
-        req = ChatRequest(messages=[msg("analyze this")], model_role="reasoner")
-        assert req.messages[0].images is None
+    def test_message_fields(self):
+        m = msg("analyze this")
+        assert m.role == "user"
+        assert m.content == "analyze this"
 
-    def test_enable_subagents_default(self):
+    def test_stream_default(self):
         req = ChatRequest(messages=[msg("test")])
-        assert req.enable_subagents is True
+        assert req.stream is False

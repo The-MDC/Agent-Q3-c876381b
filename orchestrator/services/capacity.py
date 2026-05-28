@@ -17,10 +17,10 @@ from ..memory import memory
 log = structlog.get_logger(__name__)
 
 # Thresholds
-UTIL_THRESHOLD = 0.85        # 85% utilization
-UTIL_WINDOW_SECS = 300       # 5-minute window
-QUEUE_THRESHOLD = 4          # items in flight
-QUEUE_WINDOW_SECS = 240      # 4-minute window
+UTIL_THRESHOLD = 0.85  # 85% utilization
+UTIL_WINDOW_SECS = 300  # 5-minute window
+QUEUE_THRESHOLD = 4  # items in flight
+QUEUE_WINDOW_SECS = 240  # 4-minute window
 
 
 async def record_request_start(role: str) -> None:
